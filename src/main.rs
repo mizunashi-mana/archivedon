@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::error::Error;
 
-mod cmd;
+use archivedon::cmd;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -29,14 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Serve {
-            addr,
-            port,
-            ..
-        } => cmd::serve::run(
-            addr,
-            *port,
-        ),
+        Commands::Serve { addr, port, .. } => cmd::serve::run(addr, *port),
     }
     .await?;
 
