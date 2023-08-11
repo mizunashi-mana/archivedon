@@ -89,6 +89,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
+ "serde_with",
  "tokio",
  "warp",
 ]
@@ -266,6 +267,41 @@ checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array",
  "typenum",
+]
+
+[[package]]
+name = "darling"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -534,6 +570,12 @@ checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
 ]
+
+[[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "idna"
@@ -866,6 +908,28 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1402f54f9a3b9e2efe71c1cea24e648acce55887983553eeb858cf3115acfd49"
+dependencies = [
+ "serde",
+ "serde_with_macros",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9197f1ad0e3c173a0222d3c4404fb04c3afe87e962bcb327af73e8301fa203c7"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

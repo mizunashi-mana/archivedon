@@ -1,23 +1,26 @@
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
 /**
  * ref: https://datatracker.ietf.org/doc/html/rfc7033
  */
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize)]
 pub struct Resource {
-    subject: String,
-    aliases: Vec<String>,
-    properties: HashMap<String, Option<String>>,
-    links: Option<Vec<Link>>,
+    pub subject: String,
+    pub aliases: Option<Vec<String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
+    pub links: Option<Vec<Link>>,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize)]
 pub struct Link {
-    rel: String,
+    pub rel: String,
     #[serde(rename = "type")]
-    typ: Option<String>,
-    href: Option<String>,
-    titles: Option<HashMap<String, String>>,
-    properties: Option<HashMap<String, Option<String>>>,
+    pub typ: Option<String>,
+    pub href: Option<String>,
+    pub titles: Option<HashMap<String, String>>,
+    pub properties: Option<HashMap<String, Option<String>>>,
 }

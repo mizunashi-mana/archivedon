@@ -1,9 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
 };
 use warp::Filter;
+
+mod webfinger;
 
 pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Error>> {
     let addr = match addr_opt {
@@ -14,8 +15,8 @@ pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Err
 
     let webfinger = warp::get()
         .and(warp::path!(".well-known" / "webfinger"))
-        .and(warp::query::<WebFingerQueryParams>())
-        .and_then(handle_webfinger);
+        .and(warp::query::<Vec<(String, String)>>())
+        .and_then(webfinger::handle);
 
     let user = warp::get()
         .and(warp::path!("users" / String))
@@ -38,17 +39,6 @@ pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Err
     Ok(())
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct WebFingerQueryParams {
-    resource: String,
-}
-
-async fn handle_webfinger(
-    params: WebFingerQueryParams,
-) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    Ok(Box::new(format!("Hello, {:?}!", &params)))
-}
-
 async fn handle_user(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     Ok(Box::new(format!("name={}", name)))
 }
@@ -59,4 +49,18 @@ async fn handle_user_redirect(name: String) -> Result<Box<dyn warp::Reply>, warp
 
 async fn handle_profile(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     Ok(Box::new(format!("name={}", name)))
+}
+
+pub fn bad_request() -> Box<dyn warp::Reply> {
+    Box::new(warp::reply::with_status(
+        "Bad request",
+        warp::http::StatusCode::BAD_REQUEST,
+    ))
+}
+
+pub fn not_found() -> Box<dyn warp::Reply> {
+    Box::new(warp::reply::with_status(
+        "Not found",
+        warp::http::StatusCode::NOT_FOUND,
+    ))
 }

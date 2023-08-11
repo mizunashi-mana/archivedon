@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 
 /**
@@ -19,6 +20,7 @@ pub enum Iri {
     TypeCoercion(TypeCoercion),
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct TypeCoercion {
     #[serde(rename = "@id")]

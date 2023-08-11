@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::activitypub::context::{Context, Iri};
 
@@ -71,6 +72,7 @@ pub fn default_context() -> Context {
  * Reference:
  * - https://www.w3.org/wiki/Activity_Streams_extensions
  */
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct Actor {
     #[serde(rename = "@context")]
@@ -117,6 +119,4 @@ pub struct Actor {
 
     // http://joinmastodon.org/ns#devices
     pub devices: Option<String>,
-
-    // https://w3id.org/security/v1
 }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use archivedon::activitypub::actor::{Actor, default_context};
+use archivedon::activitypub::actor::{default_context, Actor};
 use chrono::DateTime;
 use serde_json::Value;
 
@@ -18,17 +18,24 @@ fn serialize() {
         following: String::from("https://example.com/users/sample/following"),
         followers: String::from("https://example.com/users/sample/followers"),
         manually_approves_followers: Some(false),
-        also_known_as: Some(vec![String::from("https://example.com/users/sample_alias"),]),
+        also_known_as: Some(vec![String::from("https://example.com/users/sample_alias")]),
         moved_to: Some(String::from("https://example.com/users/sample_alias")),
-        featured: Some(String::from("https://example.com/users/sample/collections/featured")),
-        featured_tags: Some(String::from("https://example.com/users/sample/collections/tags")),
+        featured: Some(String::from(
+            "https://example.com/users/sample/collections/featured",
+        )),
+        featured_tags: Some(String::from(
+            "https://example.com/users/sample/collections/tags",
+        )),
         discoverable: Some(true),
         suspended: Some(true),
-        devices: Some(String::from("https://example.com/users/sample/collections/devices")),
+        devices: Some(String::from(
+            "https://example.com/users/sample/collections/devices",
+        )),
         preferred_username: Some(String::from("sample")),
-        endpoints: Some(HashMap::from([
-            (String::from("sharedInbox"), String::from("https://example.com/inbox")),
-        ])),
+        endpoints: Some(HashMap::from([(
+            String::from("sharedInbox"),
+            String::from("https://example.com/inbox"),
+        )])),
         published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
     };
     let serialized_data = serde_json::to_value(&data).unwrap();
@@ -92,10 +99,7 @@ fn serialize() {
     }"#;
     let expected_data: Value = serde_json::from_str(expected_data).unwrap();
 
-    assert_eq!(
-        serialized_data,
-        expected_data,
-    );
+    assert_eq!(serialized_data, expected_data,);
 }
 
 #[test]
@@ -176,15 +180,22 @@ fn deserialize() {
             manually_approves_followers: Some(false),
             also_known_as: Some(vec![String::from("https://example.com/users/sample_alias"),]),
             moved_to: Some(String::from("https://example.com/users/sample_alias")),
-            featured: Some(String::from("https://example.com/users/sample/collections/featured")),
-            featured_tags: Some(String::from("https://example.com/users/sample/collections/tags")),
+            featured: Some(String::from(
+                "https://example.com/users/sample/collections/featured"
+            )),
+            featured_tags: Some(String::from(
+                "https://example.com/users/sample/collections/tags"
+            )),
             discoverable: Some(true),
             suspended: Some(true),
-            devices: Some(String::from("https://example.com/users/sample/collections/devices")),
+            devices: Some(String::from(
+                "https://example.com/users/sample/collections/devices"
+            )),
             preferred_username: Some(String::from("sample")),
-            endpoints: Some(HashMap::from([
-                (String::from("sharedInbox"), String::from("https://example.com/inbox")),
-            ])),
+            endpoints: Some(HashMap::from([(
+                String::from("sharedInbox"),
+                String::from("https://example.com/inbox")
+            ),])),
             published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
         }
     );
