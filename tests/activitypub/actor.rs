@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use archivedon::activitypub::actor::{Actor, default_context};
+use chrono::DateTime;
 use serde_json::Value;
 
 #[test]
@@ -9,9 +10,9 @@ fn serialize() {
         schema_context: default_context(),
         id: String::from("https://example.com/users/sample"),
         typ: String::from("Person"),
-        name: String::from("Name"),
-        summary: String::from("Summary"),
-        url: String::from("https://example.com/@sample"),
+        name: Some(String::from("Name")),
+        summary: Some(String::from("Summary")),
+        url: Some(String::from("https://example.com/@sample")),
         inbox: String::from("https://example.com/users/sample/inbox"),
         outbox: String::from("https://example.com/users/sample/outbox"),
         following: String::from("https://example.com/users/sample/following"),
@@ -24,11 +25,11 @@ fn serialize() {
         discoverable: Some(true),
         suspended: Some(true),
         devices: Some(String::from("https://example.com/users/sample/collections/devices")),
-        device_id: None,
         preferred_username: Some(String::from("sample")),
         endpoints: Some(HashMap::from([
             (String::from("sharedInbox"), String::from("https://example.com/inbox")),
         ])),
+        published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
     };
     let serialized_data = serde_json::to_value(&data).unwrap();
     let expected_data = r#"{
@@ -61,8 +62,7 @@ fn serialize() {
             "devices": {
                 "@id": "toot:devices",
                 "@type": "@id"
-            },
-            "deviceId": "toot:deviceId"
+            }
           }
         ],
         "id": "https://example.com/users/sample",
@@ -85,10 +85,10 @@ fn serialize() {
         "suspended": true,
         "devices": "https://example.com/users/sample/collections/devices",
         "preferredUsername": "sample",
-        "deviceId": null,
         "endpoints": {
             "sharedInbox": "https://example.com/inbox"
-        }
+        },
+        "published": "2023-04-15T11:22:33Z"
     }"#;
     let expected_data: Value = serde_json::from_str(expected_data).unwrap();
 
@@ -130,8 +130,7 @@ fn deserialize() {
             "devices": {
                 "@id": "toot:devices",
                 "@type": "@id"
-            },
-            "deviceId": "toot:deviceId"
+            }
           }
         ],
         "id": "https://example.com/users/sample",
@@ -154,10 +153,10 @@ fn deserialize() {
         "suspended": true,
         "devices": "https://example.com/users/sample/collections/devices",
         "preferredUsername": "sample",
-        "deviceId": null,
         "endpoints": {
             "sharedInbox": "https://example.com/inbox"
-        }
+        },
+        "published": "2023-04-15T11:22:33Z"
     }"#;
     let data: Actor = serde_json::from_str(serialized_data).unwrap();
 
@@ -167,9 +166,9 @@ fn deserialize() {
             schema_context: default_context(),
             id: String::from("https://example.com/users/sample"),
             typ: String::from("Person"),
-            name: String::from("Name"),
-            summary: String::from("Summary"),
-            url: String::from("https://example.com/@sample"),
+            name: Some(String::from("Name")),
+            summary: Some(String::from("Summary")),
+            url: Some(String::from("https://example.com/@sample")),
             inbox: String::from("https://example.com/users/sample/inbox"),
             outbox: String::from("https://example.com/users/sample/outbox"),
             following: String::from("https://example.com/users/sample/following"),
@@ -182,11 +181,11 @@ fn deserialize() {
             discoverable: Some(true),
             suspended: Some(true),
             devices: Some(String::from("https://example.com/users/sample/collections/devices")),
-            device_id: None,
             preferred_username: Some(String::from("sample")),
             endpoints: Some(HashMap::from([
                 (String::from("sharedInbox"), String::from("https://example.com/inbox")),
             ])),
+            published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
         }
     );
 }

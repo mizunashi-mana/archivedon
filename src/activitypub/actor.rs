@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 
 use crate::activitypub::context::{Context, Iri};
 
@@ -32,7 +33,6 @@ pub fn default_context() -> Context {
         ]),
         Context::from([
             ("toot", Iri::from("http://joinmastodon.org/ns#")),
-            ("deviceId", Iri::from("toot:deviceId")),
             (
                 "devices",
                 Iri::from(TypeCoercion {
@@ -80,9 +80,10 @@ pub struct Actor {
     pub id: String,
     #[serde(rename = "type")]
     pub typ: String,
-    pub name: String,
-    pub summary: String,
-    pub url: String,
+    pub name: Option<String>,
+    pub summary: Option<String>,
+    pub url: Option<String>,
+    pub published: Option<DateTime<Utc>>,
 
     // https://www.w3.org/ns/activitystreams#Actor
     pub inbox: String,
@@ -116,10 +117,6 @@ pub struct Actor {
 
     // http://joinmastodon.org/ns#devices
     pub devices: Option<String>,
-
-    // http://joinmastodon.org/ns#deviceId
-    #[serde(rename = "deviceId")]
-    pub device_id: Option<String>,
 
     // https://w3id.org/security/v1
 }
