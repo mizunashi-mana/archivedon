@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use serde_with::skip_serializing_none;
 
 use crate::activitypub::context::{Context, Iri};
@@ -67,7 +68,7 @@ pub fn default_context() -> Context {
  * - https://docs.joinmastodon.org/spec/activitypub/#contexts
  * - https://docs.joinmastodon.org/spec/activitypub/#as
  * - https://docs.joinmastodon.org/spec/activitypub/#toot
- * - https://w3id.org/security/v1
+ * - https://w3c.github.io/vc-data-integrity/vocab/security/vocabulary.html
  *
  * Reference:
  * - https://www.w3.org/wiki/Activity_Streams_extensions
@@ -86,6 +87,14 @@ pub struct Actor {
     pub summary: Option<String>,
     pub url: Option<String>,
     pub published: Option<DateTime<Utc>>,
+    // TODO: more strict schema
+    pub icon: Option<Value>,
+    // TODO: more strict schema
+    pub attachment: Option<Vec<Value>>,
+    // TODO: more strict schema
+    pub image: Option<Value>,
+    // TODO: more strict schema
+    pub tag: Option<Vec<Value>>,
 
     // https://www.w3.org/ns/activitystreams#Actor
     pub inbox: String,
@@ -119,4 +128,17 @@ pub struct Actor {
 
     // http://joinmastodon.org/ns#devices
     pub devices: Option<String>,
+
+    // https://w3id.org/security/v1
+    #[serde(rename = "publicKey")]
+    pub public_key: Option<Key>,
+}
+
+#[skip_serializing_none]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub struct Key {
+    pub id: String,
+    pub owner: String,
+    #[serde(rename = "publicKeyPem")]
+    pub public_key_pem: Option<String>,
 }

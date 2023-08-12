@@ -1,5 +1,5 @@
-use crate::webfinger;
 use crate::cmd::serve;
+use crate::webfinger;
 
 pub async fn handle(
     params: Vec<(String, String)>,
@@ -9,9 +9,7 @@ pub async fn handle(
     if let Some(resource) = params.resource.strip_prefix("acct:") {
         match resource.split_once('@') {
             None => Ok(serve::bad_request()),
-            Some((username, domain)) => {
-                handle_account(username, domain, params.rel).await
-            }
+            Some((username, domain)) => handle_account(username, domain, params.rel).await,
         }
     } else {
         Ok(serve::bad_request())
@@ -44,20 +42,17 @@ impl QueryParams {
         }
 
         match resource {
-            None => {
-                Err(warp::reject())
-            }
-            Some(resource) => {
-                Ok(Self {
-                    resource,
-                    rel,
-                })
-            }
+            None => Err(warp::reject()),
+            Some(resource) => Ok(Self { resource, rel }),
         }
     }
 }
 
-async fn handle_account(username: &str, domain: &str, rel: Vec<String>) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
+async fn handle_account(
+    username: &str,
+    domain: &str,
+    rel: Vec<String>,
+) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     if domain != "localhost" {
         return Ok(serve::not_found());
     }
