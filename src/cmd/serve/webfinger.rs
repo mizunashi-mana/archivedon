@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
 use crate::cmd::serve;
+use crate::env::Env;
 use crate::webfinger;
 
 pub async fn handle(
+    env: Arc<dyn Env>,
     params: Vec<(String, String)>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     let params = QueryParams::parse(params)?;
@@ -9,7 +13,7 @@ pub async fn handle(
     if let Some(resource) = params.resource.strip_prefix("acct:") {
         match resource.split_once('@') {
             None => Ok(serve::bad_request()),
-            Some((username, domain)) => handle_account(username, domain, params.rel).await,
+            Some((username, domain)) => handle_account(env, username, domain, params.rel).await,
         }
     } else {
         Ok(serve::bad_request())
@@ -49,11 +53,12 @@ impl QueryParams {
 }
 
 async fn handle_account(
+    env: Arc<dyn Env>,
     username: &str,
     domain: &str,
     rel: Vec<String>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    if domain != "localhost" {
+    if env.is_target_domain(domain) {
         return Ok(serve::not_found());
     }
 

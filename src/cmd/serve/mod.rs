@@ -1,12 +1,19 @@
 use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
+    sync::Arc,
 };
 use warp::Filter;
 
+use crate::env::Env;
+
 mod webfinger;
 
-pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Error>> {
+pub async fn run(
+    env: Arc<dyn Env>,
+    addr_opt: &Option<String>,
+    port: u16,
+) -> Result<(), Box<dyn Error>> {
     let addr = match addr_opt {
         Some(addr_raw) => addr_raw.parse()?,
         None => IpAddr::from([0, 0, 0, 0]),
@@ -15,6 +22,7 @@ pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Err
 
     let webfinger = warp::get()
         .and(warp::path!(".well-known" / "webfinger"))
+        .map(move || env.clone())
         .and(warp::query::<Vec<(String, String)>>())
         .and_then(webfinger::handle);
 

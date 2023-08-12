@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::error::Error;
 
 use archivedon::cmd;
+use archivedon::env;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -27,9 +28,10 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+    let env = env::env(vec![String::from("localhost")]);
 
     match &cli.command {
-        Commands::Serve { addr, port, .. } => cmd::serve::run(addr, *port),
+        Commands::Serve { addr, port, .. } => cmd::serve::run(env, addr, *port),
     }
     .await?;
 
