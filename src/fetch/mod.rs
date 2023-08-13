@@ -1,11 +1,8 @@
 use std::error::Error;
-use url::Url;
 
 mod activitypub;
 mod input;
 mod webfinger;
-
-use archivedon::webfinger::resource::Resource as WebfingerResource;
 
 pub async fn run(input_path: &str) -> Result<(), Box<dyn Error>> {
     let input = input::load(input_path).await?;
@@ -25,13 +22,10 @@ pub async fn fetch_account(client: &reqwest::Client, account: &str) -> Result<()
         Some(x) => x,
     };
 
-    let webfinger_url = Url::parse_with_params(
-        &format!("https://{domain}/.well-known/webfinger"),
-        &[("resource", format!("acct:{username}@{domain}"))],
-    )?;
-    let acct: WebfingerResource =
-        webfinger::fetch_webfinger_resource(client, webfinger_url.as_str()).await?;
-    println!("{:?}", &acct);
+    let account_actor_url = webfinger::fetch_ap_account_actor_url(client, username, domain).await?;
+    let account_actor = activitypub::fetch_actor(client, account_actor_url).await?;
+
+    println!("{:?}", account_actor);
 
     Ok(())
 }

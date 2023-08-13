@@ -3,12 +3,12 @@ use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use std::error::Error;
 
-pub async fn fetch_actor(client: reqwest::Client, uri: String) -> Result<Actor, Box<dyn Error>> {
+pub async fn fetch_actor(client: &reqwest::Client, uri: String) -> Result<Actor, Box<dyn Error>> {
     fetch_ap_resource(client, uri).await
 }
 
 pub async fn fetch_ap_resource<T: DeserializeOwned>(
-    client: reqwest::Client,
+    client: &reqwest::Client,
     uri: String,
 ) -> Result<T, Box<dyn Error>> {
     let current_uri: String = uri;
