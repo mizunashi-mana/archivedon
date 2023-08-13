@@ -1,7 +1,4 @@
-use archivedon::activitypub::{
-    outbox::{default_context, Outbox},
-    typ::OrderedCollection,
-};
+use archivedon::activitypub::collection::{default_context, Collection};
 
 #[test]
 fn deserialize() {
@@ -13,16 +10,17 @@ fn deserialize() {
         "items": []
     }"#;
 
-    let data: Outbox = serde_json::from_str(serialized_data).unwrap();
+    let data: Collection = serde_json::from_str(serialized_data).unwrap();
 
     assert_eq!(
         data,
-        Outbox {
+        Collection {
             schema_context: default_context(),
             id: String::from("https://example.com/users/sample/outbox"),
-            typ: OrderedCollection,
+            typ: String::from("OrderedCollection"),
             total_items: 0,
             items: Some(vec![]),
+            ordered_items: None,
             first: None,
             last: None,
         },

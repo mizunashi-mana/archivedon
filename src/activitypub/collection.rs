@@ -3,22 +3,21 @@ use serde_json::Value;
 
 use crate::activitypub::context::Context;
 
-use super::typ::Collection;
-
 pub fn default_context() -> Context {
     Context::from("https://www.w3.org/ns/activitystreams")
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct FeaturedTags {
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub struct Collection {
     #[serde(rename = "@context")]
     pub schema_context: Context,
     pub id: String,
     #[serde(rename = "type")]
-    pub typ: Collection,
+    pub typ: String,
     #[serde(rename = "totalItems")]
     pub total_items: usize,
     pub first: Option<String>,
     pub last: Option<String>,
     pub items: Option<Vec<Value>>,
+    pub ordered_items: Option<Vec<Value>>,
 }

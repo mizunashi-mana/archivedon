@@ -1,19 +1,16 @@
 use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
 };
 use warp::Filter;
 
-use crate::env::Env;
-
-mod webfinger;
 
 pub async fn run(
-    env: Arc<dyn Env>,
     addr_opt: &Option<String>,
     port: u16,
 ) -> Result<(), Box<dyn Error>> {
+    let env = env::env(vec![String::from("localhost")]);
+
     let addr = match addr_opt {
         Some(addr_raw) => addr_raw.parse()?,
         None => IpAddr::from([0, 0, 0, 0]),
