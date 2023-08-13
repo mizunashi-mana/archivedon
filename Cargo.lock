@@ -92,6 +92,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "tokio",
+ "url",
  "warp",
 ]
 

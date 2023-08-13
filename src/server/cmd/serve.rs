@@ -4,11 +4,10 @@ use std::{
 };
 use warp::Filter;
 
+use crate::server::env;
+use crate::server::handler::webfinger;
 
-pub async fn run(
-    addr_opt: &Option<String>,
-    port: u16,
-) -> Result<(), Box<dyn Error>> {
+pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Error>> {
     let env = env::env(vec![String::from("localhost")]);
 
     let addr = match addr_opt {
@@ -54,18 +53,4 @@ async fn handle_user_redirect(name: String) -> Result<Box<dyn warp::Reply>, warp
 
 async fn handle_profile(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     Ok(Box::new(format!("name={}", name)))
-}
-
-pub fn bad_request() -> Box<dyn warp::Reply> {
-    Box::new(warp::reply::with_status(
-        "Bad request",
-        warp::http::StatusCode::BAD_REQUEST,
-    ))
-}
-
-pub fn not_found() -> Box<dyn warp::Reply> {
-    Box::new(warp::reply::with_status(
-        "Not found",
-        warp::http::StatusCode::NOT_FOUND,
-    ))
 }

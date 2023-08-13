@@ -1,7 +1,8 @@
-use std::sync::Arc;
 use archivedon::webfinger;
+use std::sync::Arc;
 
-use crate::env::Env;
+use crate::server::env::Env;
+use crate::server::handler;
 
 pub async fn handle(
     env: Arc<dyn Env>,
@@ -11,11 +12,11 @@ pub async fn handle(
 
     if let Some(resource) = params.resource.strip_prefix("acct:") {
         match resource.split_once('@') {
-            None => Ok(crate::bad_request()),
+            None => Ok(handler::bad_request()),
             Some((username, domain)) => handle_account(env, username, domain, params.rel).await,
         }
     } else {
-        Ok(crate::bad_request())
+        Ok(handler::bad_request())
     }
 }
 
@@ -58,15 +59,15 @@ async fn handle_account(
     rel: Vec<String>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     if env.is_target_domain(domain) {
-        return Ok(crate::not_found());
+        return Ok(handler::not_found());
     }
 
     if username != "sample" {
-        return Ok(crate::not_found());
+        return Ok(handler::not_found());
     }
 
     if !rel.is_empty() {
-        return Ok(crate::bad_request());
+        return Ok(handler::bad_request());
     }
 
     let result = webfinger::resource::Resource {

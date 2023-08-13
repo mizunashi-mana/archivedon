@@ -6,7 +6,7 @@ use std::collections::HashMap;
  * ref: https://datatracker.ietf.org/doc/html/rfc7033
  */
 #[skip_serializing_none]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Resource {
     pub subject: String,
     pub aliases: Option<Vec<String>>,
@@ -15,7 +15,7 @@ pub struct Resource {
 }
 
 #[skip_serializing_none]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Link {
     pub rel: String,
     #[serde(rename = "type")]
