@@ -10,12 +10,12 @@ use crate::fetch::webfinger;
 
 pub async fn fetch_ap_account_actor_url(
     client: &reqwest::Client,
-    username: &str,
     domain: &str,
+    subject: &str,
 ) -> Result<String, Box<dyn Error>> {
     let webfinger_url = Url::parse_with_params(
         &format!("https://{domain}/.well-known/webfinger"),
-        &[("resource", format!("acct:{username}@{domain}"))],
+        &[("resource", subject)],
     )?;
     let acct: WebfingerResource =
         webfinger::fetch_webfinger_resource(client, webfinger_url.as_str()).await?;
@@ -24,7 +24,7 @@ pub async fn fetch_ap_account_actor_url(
         .links
         .and_then(|links| links.into_iter().find(|link| link.rel == "self"))
     {
-        None => return Err(format!("The self link is not found: {username}@{domain}").into()),
+        None => return Err(format!("The self link is not found: {subject}").into()),
         Some(x) => x,
     };
 
@@ -34,7 +34,7 @@ pub async fn fetch_ap_account_actor_url(
     };
     if !is_valid_type {
         return Err(format!(
-            "The self link is not an actor of ActivityPub: {username}@{domain}, type={:?}",
+            "The self link is not an actor of ActivityPub: {subject}, type={:?}",
             &self_link.typ
         )
         .into());
@@ -42,7 +42,7 @@ pub async fn fetch_ap_account_actor_url(
 
     let acct_actor_url = match self_link.href {
         None => {
-            return Err(format!("The self link does not have a URL: {username}@{domain}").into())
+            return Err(format!("The self link does not have a URL: {subject}").into())
         }
         Some(x) => x,
     };

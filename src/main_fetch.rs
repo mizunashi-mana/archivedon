@@ -11,13 +11,15 @@ struct Cli {
     debug: u8,
     #[arg(short, long)]
     input: String,
+    #[arg(short, long)]
+    output: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    fetch::run(&cli.input).await?;
+    fetch::run(&cli.input, &cli.output).await?;
 
     Ok(())
 }
