@@ -37,10 +37,17 @@ impl Output {
         Ok(())
     }
 
-    pub async fn save_static_resource<T: Serialize>(&self, path: &str, content: &T) -> Result<(), Box<dyn Error>> {
+    pub async fn save_static_json_resource<T: Serialize>(&self, path: &str, content: &T) -> Result<(), Box<dyn Error>> {
         let save_path = self.static_dir.join(path);
         fs::create_dir_all(save_path.parent().unwrap()).await?;
         fs::write(&save_path, serde_json::to_vec(content)?).await?;
+        Ok(())
+    }
+
+    pub async fn save_static_text_resource(&self, path: &str, content: &str) -> Result<(), Box<dyn Error>> {
+        let save_path = self.static_dir.join(path);
+        fs::create_dir_all(save_path.parent().unwrap()).await?;
+        fs::write(&save_path, content).await?;
         Ok(())
     }
 }
