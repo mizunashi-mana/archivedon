@@ -41,9 +41,7 @@ pub async fn fetch_ap_account_actor_url(
     }
 
     let acct_actor_url = match self_link.href {
-        None => {
-            return Err(format!("The self link does not have a URL: {subject}").into())
-        }
+        None => return Err(format!("The self link does not have a URL: {subject}").into()),
         Some(x) => x,
     };
 

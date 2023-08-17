@@ -4,7 +4,7 @@ use serde_json::Value;
 #[test]
 fn serialize() {
     let data = Resource {
-        subject: String::from("acct:sample@example.com"),
+        subject: "acct:sample@example.com".to_string(),
         aliases: None,
         properties: None,
         links: None,

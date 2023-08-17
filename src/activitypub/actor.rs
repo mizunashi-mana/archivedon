@@ -17,8 +17,8 @@ pub fn default_context() -> Context {
             (
                 "alsoKnownAs",
                 Iri::from(TypeCoercion {
-                    id: String::from("as:alsoKnownAs"),
-                    typ: Some(String::from("@id")),
+                    id: "as:alsoKnownAs".to_string(),
+                    typ: Some("@id".to_string()),
                 }),
             ),
             (
@@ -28,8 +28,8 @@ pub fn default_context() -> Context {
             (
                 "movedTo",
                 Iri::from(TypeCoercion {
-                    id: String::from("as:movedTo"),
-                    typ: Some(String::from("@id")),
+                    id: "as:movedTo".to_string(),
+                    typ: Some("@id".to_string()),
                 }),
             ),
         ]),
@@ -38,23 +38,23 @@ pub fn default_context() -> Context {
             (
                 "devices",
                 Iri::from(TypeCoercion {
-                    id: String::from("toot:devices"),
-                    typ: Some(String::from("@id")),
+                    id: "toot:devices".to_string(),
+                    typ: Some("@id".to_string()),
                 }),
             ),
             ("discoverable", Iri::from("toot:discoverable")),
             (
                 "featured",
                 Iri::from(TypeCoercion {
-                    id: String::from("toot:featured"),
-                    typ: Some(String::from("@id")),
+                    id: "toot:featured".to_string(),
+                    typ: Some("@id".to_string()),
                 }),
             ),
             (
                 "featuredTags",
                 Iri::from(TypeCoercion {
-                    id: String::from("toot:featuredTags"),
-                    typ: Some(String::from("@id")),
+                    id: "toot:featuredTags".to_string(),
+                    typ: Some("@id".to_string()),
                 }),
             ),
             ("suspended", Iri::from("toot:suspended")),

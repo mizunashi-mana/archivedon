@@ -16,8 +16,8 @@ fn deserialize() {
         data,
         Collection {
             schema_context: default_context(),
-            id: String::from("https://example.com/users/sample/outbox"),
-            typ: String::from("OrderedCollection"),
+            id: "https://example.com/users/sample/outbox".to_string(),
+            typ: "OrderedCollection".to_string(),
             total_items: 0,
             items: Some(vec![]),
             ordered_items: None,

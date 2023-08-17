@@ -1,14 +1,19 @@
 use std::error::Error;
 
 use handlebars::Handlebars;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub const TEMPLATE_PROFILE_HTML_KEY: &str = "PROFILE_HTML";
 
 #[derive(Serialize, Deserialize)]
 pub struct ProfileHtmlParams {
-    pub name: String,
-    pub summary: String,
+    pub account: String,
+    pub actor_url: String,
+    pub name: Option<String>,
+    pub summary: Option<String>,
+    pub url: Option<String>,
+    pub moved_to: Option<String>,
+    pub moved_profile_url: Option<String>,
 }
 
 pub struct Templates<'a> {
@@ -25,21 +30,33 @@ impl<'a> Templates<'a> {
             "<head>",
             "<meta charset=\"utf-8\">",
             "<meta content=\"width=device-width, initial-scale=1\" name=\"viewport\">",
-            "<title>Archivedon - {{name}}</title>",
+            "<title>Archived - {{account}}</title>",
+            "<link href=\"{{actor_url}}\" rel=\"alternate\" type=\"application/activity+json\">",
+            "<meta content=\"{{account}}\" property=\"profile:username\">",
             "</head>",
             "<body>",
-            "<h1>{{name}}</h1>",
-            "<div>{{{summary}}}</div>",
+            "<h1>Archived User: {{account}}</h1>",
+            "<dl>",
+            "{{#if moved_to}}{{#if moved_profile_url}}",
+            "<dt>Moved To</dt><dd><a href=\"{{moved_profile_url}}\">{{moved_to}}</a></dd>",
+            "{{else}}",
+            "<dt>Moved To</dt><dd>{{moved_to}}</dd>",
+            "{{/if}}{{/if}}",
+            "{{#if name}}<dt>Name</dt><dd>{{name}}</dd>{{/if}}",
+            "{{#if summary}}<dt>Summary</dt><dd>{{{summary}}}</dd>{{/if}}",
+            "{{#if url}}<dt>URL</dt><dd><a href=\"{{url}}\">{{url}}</a></dd>{{/if}}",
+            "</dl>",
             "</body>",
             "</html>",
         ].join(""))?;
 
-        Ok(Templates {
-            handlebars,
-        })
+        Ok(Templates { handlebars })
     }
 
-    pub fn render_profile_html(&self, params: &ProfileHtmlParams) -> Result<String, Box<dyn Error>> {
+    pub fn render_profile_html(
+        &self,
+        params: &ProfileHtmlParams,
+    ) -> Result<String, Box<dyn Error>> {
         Ok(self.handlebars.render(TEMPLATE_PROFILE_HTML_KEY, params)?)
     }
 }

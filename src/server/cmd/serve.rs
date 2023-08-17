@@ -8,7 +8,7 @@ use crate::server::env;
 use crate::server::handler::webfinger;
 
 pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Error>> {
-    let env = env::env(vec![String::from("localhost")]);
+    let env = env::env(vec!["localhost".to_string()]);
 
     let addr = match addr_opt {
         Some(addr_raw) => addr_raw.parse()?,

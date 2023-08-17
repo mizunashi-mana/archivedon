@@ -40,7 +40,7 @@ impl<const N: usize> From<[(&str, Iri); N]> for Context {
         let defs = HashMap::from_iter(
             value
                 .into_iter()
-                .map(|entry| (String::from(entry.0), entry.1)),
+                .map(|entry| (entry.0.to_string(), entry.1)),
         );
         Self::TermDefs(defs)
     }
@@ -48,7 +48,7 @@ impl<const N: usize> From<[(&str, Iri); N]> for Context {
 
 impl From<&str> for Iri {
     fn from(value: &str) -> Self {
-        Self::Direct(String::from(value))
+        Self::Direct(value.to_string())
     }
 }
 

@@ -8,33 +8,27 @@ use serde_json::Value;
 fn serialize() {
     let data = Actor {
         schema_context: default_context(),
-        id: String::from("https://example.com/users/sample"),
-        typ: String::from("Person"),
-        name: Some(String::from("Name")),
-        summary: Some(String::from("Summary")),
-        url: Some(String::from("https://example.com/@sample")),
-        inbox: String::from("https://example.com/users/sample/inbox"),
-        outbox: String::from("https://example.com/users/sample/outbox"),
-        following: String::from("https://example.com/users/sample/following"),
-        followers: String::from("https://example.com/users/sample/followers"),
+        id: "https://example.com/users/sample".to_string(),
+        typ: "Person".to_string(),
+        name: Some("Name".to_string()),
+        summary: Some("Summary".to_string()),
+        url: Some("https://example.com/@sample".to_string()),
+        inbox: "https://example.com/users/sample/inbox".to_string(),
+        outbox: "https://example.com/users/sample/outbox".to_string(),
+        following: "https://example.com/users/sample/following".to_string(),
+        followers: "https://example.com/users/sample/followers".to_string(),
         manually_approves_followers: Some(false),
-        also_known_as: Some(vec![String::from("https://example.com/users/sample_alias")]),
-        moved_to: Some(String::from("https://example.com/users/sample_alias")),
-        featured: Some(String::from(
-            "https://example.com/users/sample/collections/featured",
-        )),
-        featured_tags: Some(String::from(
-            "https://example.com/users/sample/collections/tags",
-        )),
+        also_known_as: Some(vec!["https://example.com/users/sample_alias".to_string()]),
+        moved_to: Some("https://example.com/users/sample_alias".to_string()),
+        featured: Some("https://example.com/users/sample/collections/featured".to_string()),
+        featured_tags: Some("https://example.com/users/sample/collections/tags".to_string()),
         discoverable: Some(true),
         suspended: Some(true),
-        devices: Some(String::from(
-            "https://example.com/users/sample/collections/devices",
-        )),
-        preferred_username: Some(String::from("sample")),
+        devices: Some("https://example.com/users/sample/collections/devices".to_string()),
+        preferred_username: Some("sample".to_string()),
         endpoints: Some(HashMap::from([(
-            String::from("sharedInbox"),
-            String::from("https://example.com/inbox"),
+            "sharedInbox".to_string(),
+            "https://example.com/inbox".to_string(),
         )])),
         published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
         attachment: Some(vec![]),
@@ -42,9 +36,9 @@ fn serialize() {
         icon: None,
         image: None,
         public_key: Some(Key {
-            id: String::from("https://example.com/users/sample#main-key"),
-            owner: String::from("https://example.com/users/sample"),
-            public_key_pem: Some(String::from("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n")),
+            id: "https://example.com/users/sample#main-key".to_string(),
+            owner: "https://example.com/users/sample".to_string(),
+            public_key_pem: Some("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n".to_string()),
         }),
     };
     let serialized_data = serde_json::to_value(&data).unwrap();
@@ -191,33 +185,27 @@ fn deserialize() {
         data,
         Actor {
             schema_context: default_context(),
-            id: String::from("https://example.com/users/sample"),
-            typ: String::from("Person"),
-            name: Some(String::from("Name")),
-            summary: Some(String::from("Summary")),
-            url: Some(String::from("https://example.com/@sample")),
-            inbox: String::from("https://example.com/users/sample/inbox"),
-            outbox: String::from("https://example.com/users/sample/outbox"),
-            following: String::from("https://example.com/users/sample/following"),
-            followers: String::from("https://example.com/users/sample/followers"),
+            id: "https://example.com/users/sample".to_string(),
+            typ: "Person".to_string(),
+            name: Some("Name".to_string()),
+            summary: Some("Summary".to_string()),
+            url: Some("https://example.com/@sample".to_string()),
+            inbox: "https://example.com/users/sample/inbox".to_string(),
+            outbox: "https://example.com/users/sample/outbox".to_string(),
+            following: "https://example.com/users/sample/following".to_string(),
+            followers: "https://example.com/users/sample/followers".to_string(),
             manually_approves_followers: Some(false),
-            also_known_as: Some(vec![String::from("https://example.com/users/sample_alias"),]),
-            moved_to: Some(String::from("https://example.com/users/sample_alias")),
-            featured: Some(String::from(
-                "https://example.com/users/sample/collections/featured"
-            )),
-            featured_tags: Some(String::from(
-                "https://example.com/users/sample/collections/tags"
-            )),
+            also_known_as: Some(vec!["https://example.com/users/sample_alias".to_string()]),
+            moved_to: Some("https://example.com/users/sample_alias".to_string()),
+            featured: Some("https://example.com/users/sample/collections/featured".to_string()),
+            featured_tags: Some("https://example.com/users/sample/collections/tags".to_string()),
             discoverable: Some(true),
             suspended: Some(true),
-            devices: Some(String::from(
-                "https://example.com/users/sample/collections/devices"
-            )),
-            preferred_username: Some(String::from("sample")),
+            devices: Some("https://example.com/users/sample/collections/devices".to_string()),
+            preferred_username: Some("sample".to_string()),
             endpoints: Some(HashMap::from([(
-                String::from("sharedInbox"),
-                String::from("https://example.com/inbox")
+                "sharedInbox".to_string(),
+                "https://example.com/inbox".to_string(),
             ),])),
             published: Some(DateTime::from_str("2023-04-15T11:22:33Z").unwrap()),
             attachment: Some(vec![]),
@@ -225,9 +213,9 @@ fn deserialize() {
             icon: None,
             image: None,
             public_key: Some(Key {
-                id: String::from("https://example.com/users/sample#main-key"),
-                owner: String::from("https://example.com/users/sample"),
-                public_key_pem: Some(String::from("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n")),
+                id: "https://example.com/users/sample#main-key".to_string(),
+                owner: "https://example.com/users/sample".to_string(),
+                public_key_pem: Some("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n".to_string()),
             }),
         }
     );
