@@ -6,8 +6,6 @@ use serde::de::DeserializeOwned;
 use archivedon::webfinger::resource::Resource as WebfingerResource;
 use url::Url;
 
-use crate::fetch::webfinger;
-
 pub async fn fetch_ap_account_actor_url(
     client: &reqwest::Client,
     domain: &str,
@@ -17,8 +15,7 @@ pub async fn fetch_ap_account_actor_url(
         &format!("https://{domain}/.well-known/webfinger"),
         &[("resource", subject)],
     )?;
-    let acct: WebfingerResource =
-        webfinger::fetch_webfinger_resource(client, webfinger_url.as_str()).await?;
+    let acct: WebfingerResource = fetch_webfinger_resource(client, webfinger_url.as_str()).await?;
 
     let self_link = match acct
         .links

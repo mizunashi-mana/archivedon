@@ -1,10 +1,20 @@
-use archivedon::activitypub::actor::Actor;
+use archivedon::activitypub::json as ap_json;
+use archivedon::activitypub::model as ap_model;
 use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use std::error::Error;
 
-pub async fn fetch_actor(client: &reqwest::Client, uri: String) -> Result<Actor, Box<dyn Error>> {
-    fetch_ap_resource(client, uri).await
+pub async fn fetch_actor(
+    client: &reqwest::Client,
+    uri: String,
+) -> Result<ap_model::Object, Box<dyn Error>> {
+    let object: ap_model::Object =
+        ap_json::ModelConv::to_model(fetch_ap_resource(client, uri).await?)?;
+    if object.actor_items.is_none() {
+        Err(format!("Actor items are should be available.").into())
+    } else {
+        Ok(object)
+    }
 }
 
 pub async fn fetch_ap_resource<T: DeserializeOwned>(

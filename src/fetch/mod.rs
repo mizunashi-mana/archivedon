@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 
 mod activitypub;
@@ -6,9 +7,8 @@ mod output;
 mod templates;
 mod webfinger;
 
-use archivedon::activitypub::actor::{self, Actor};
-use archivedon::activitypub::collection as ap_collection;
-use archivedon::activitypub::collection::Collection as ApCollection;
+use archivedon::activitypub::json::ModelConv;
+use archivedon::activitypub::model as ap_model;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
 use output::Output;
 use serde_json::json;
@@ -65,7 +65,11 @@ pub async fn fetch_account<'a>(
     let account_actor_url = webfinger::fetch_ap_account_actor_url(client, domain, &subject).await?;
     let account_actor = activitypub::fetch_actor(client, account_actor_url).await?;
 
-    if !account_actor.suspended.is_some_and(|x| x) {
+    if !account_actor
+        .mastodon_ext_items
+        .suspended
+        .is_some_and(|x| x)
+    {
         println!("Warning: account={account} is not suspended.");
     }
 
@@ -152,32 +156,34 @@ async fn save_predefs(
     output
         .save_static_json_resource(
             empty_collection_path,
-            &ApCollection {
-                schema_context: ap_collection::default_context(),
-                id: predef_urls.empty_collection_url.to_string(),
-                typ: "Collection".to_string(),
-                total_items: 0,
-                first: None,
-                last: None,
-                items: Some(vec![]),
-                ordered_items: None,
-            },
+            &ap_model::Object::new_collection(
+                Some(predef_urls.empty_collection_url.to_string()),
+                vec!["Collection".to_string()],
+                Some(0),
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+            )
+            .from_model()?,
         )
         .await?;
 
     output
         .save_static_json_resource(
             empty_ordered_collection_path,
-            &ApCollection {
-                schema_context: ap_collection::default_context(),
-                id: predef_urls.empty_ordered_collection_url.to_string(),
-                typ: "OrderedCollection".to_string(),
-                total_items: 0,
-                first: None,
-                last: None,
-                items: None,
-                ordered_items: Some(vec![]),
-            },
+            &ap_model::Object::new_collection(
+                Some(predef_urls.empty_ordered_collection_url.to_string()),
+                vec!["OrderedCollection".to_string()],
+                Some(0),
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+            )
+            .from_model()?,
         )
         .await?;
 
@@ -189,7 +195,7 @@ async fn save_profile_resource<'a>(
     account: String,
     profile_path: &str,
     ap_resource_url: &Url,
-    original_actor: &Actor,
+    original_actor: &ap_model::Object,
     moved_profile_url: &Option<String>,
     templates: &Templates<'a>,
 ) -> Result<(), Box<dyn Error>> {
@@ -199,10 +205,13 @@ async fn save_profile_resource<'a>(
             &templates.render_profile_html(&ProfileHtmlParams {
                 account,
                 actor_url: ap_resource_url.to_string(),
-                name: original_actor.name.to_owned(),
-                summary: original_actor.summary.to_owned(),
-                url: original_actor.url.to_owned(),
-                moved_to: original_actor.moved_to.to_owned(),
+                name: original_actor.object_items.name.first().cloned(),
+                summary: original_actor.object_items.summary.first().cloned(),
+                url: moved_profile_url.to_owned(),
+                moved_to: original_actor
+                    .activity_streams_ext_items
+                    .moved_to
+                    .to_owned(),
                 moved_profile_url: moved_profile_url.to_owned(),
             })?,
         )
@@ -212,44 +221,40 @@ async fn save_profile_resource<'a>(
 async fn save_actor_resource(
     output: &Output,
     ap_resource_path: &str,
-    original_actor: Actor,
+    mut actor: ap_model::Object,
     predef_urls: &PredefUrls,
     ap_resource_url: &Url,
     profile_url: &Url,
 ) -> Result<(), Box<dyn Error>> {
+    actor.id = Some(ap_resource_url.to_string());
+    actor.mastodon_ext_items.suspended = Some(true);
+    actor.object_items.url = Some(ap_model::Link {
+        href: profile_url.to_string(),
+        schema_context: None,
+        id: None,
+        typ: vec![],
+        height: None,
+        hreflang: None,
+        media_type: vec![],
+        rel: vec![],
+        width: None,
+    });
+    actor.mastodon_ext_items.featured = Some(predef_urls.empty_ordered_collection_url.to_string());
+    actor.mastodon_ext_items.featured_tags = Some(predef_urls.empty_collection_url.to_string());
+    actor.mastodon_ext_items.devices = Some(predef_urls.empty_collection_url.to_string());
+
+    match &mut actor.actor_items {
+        Some(actor_items) => {
+            actor_items.inbox = predef_urls.inbox_url.to_string();
+            actor_items.outbox = predef_urls.empty_ordered_collection_url.to_string();
+            actor_items.following = predef_urls.empty_ordered_collection_url.to_string();
+            actor_items.followers = predef_urls.empty_ordered_collection_url.to_string();
+            actor_items.endpoints = HashMap::new();
+        }
+        None => return Err(format!("unreachable: actor_items should be available.").into()),
+    };
+
     output
-        .save_static_json_resource(
-            ap_resource_path,
-            &Actor {
-                schema_context: actor::default_context(),
-                id: ap_resource_url.to_string(),
-                typ: original_actor.typ,
-                name: original_actor.name,
-                summary: original_actor.summary,
-                published: original_actor.published,
-                preferred_username: original_actor.preferred_username,
-                moved_to: original_actor.moved_to,
-                also_known_as: original_actor.also_known_as,
-                discoverable: original_actor.discoverable,
-                manually_approves_followers: original_actor.manually_approves_followers,
-                suspended: Some(true),
-                url: Some(profile_url.to_string()),
-                inbox: predef_urls.inbox_url.to_string(),
-                outbox: predef_urls.empty_ordered_collection_url.to_string(),
-                followers: predef_urls.empty_ordered_collection_url.to_string(),
-                following: predef_urls.empty_ordered_collection_url.to_string(),
-                featured: Some(predef_urls.empty_ordered_collection_url.to_string()),
-                featured_tags: Some(predef_urls.empty_collection_url.to_string()),
-                devices: Some(predef_urls.empty_collection_url.to_string()),
-                attachment: original_actor.attachment,
-                // TODO: fetch images
-                image: original_actor.image,
-                // TODO: fetch icons
-                icon: original_actor.icon,
-                tag: original_actor.tag,
-                endpoints: None,
-                public_key: original_actor.public_key,
-            },
-        )
+        .save_static_json_resource(ap_resource_path, &actor.from_model()?)
         .await
 }
