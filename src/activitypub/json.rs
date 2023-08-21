@@ -90,15 +90,15 @@ impl ModelConv for model::Object {
             },
             duration: self.object_items.duration,
             media_type: to_lax_array(self.object_items.media_type)?,
-            end_time: self.object_items.end_time,
-            published: self.object_items.published,
+            end_time: from_model_opt(self.object_items.end_time)?,
+            published: from_model_opt(self.object_items.published)?,
             summary: to_lax_array(self.object_items.summary)?,
             summary_map: if self.object_items.summary_map.is_empty() {
                 None
             } else {
                 Some(self.object_items.summary_map)
             },
-            updated: self.object_items.updated,
+            updated: from_model_opt(self.object_items.updated)?,
             describes: boxed_from_model_opt(self.object_items.describes)?,
             inbox,
             outbox,
@@ -125,7 +125,7 @@ impl ModelConv for model::Object {
             subject: boxed_from_model_opt(self.relationship_items.subject)?,
             relationship: to_lax_array(self.relationship_items.relationship)?,
             former_type: to_lax_array(self.tombstone_items.former_type)?,
-            deleted: self.tombstone_items.deleted,
+            deleted: from_model_opt(self.tombstone_items.deleted)?,
             one_of: to_lax_array(self.question_items.one_of)?,
             any_of: to_lax_array(self.question_items.any_of)?,
             closed: self.question_items.closed,
@@ -191,14 +191,14 @@ impl ModelConv for model::Object {
                 },
                 duration: origin.duration,
                 media_type: from_lax_array(origin.media_type)?,
-                end_time: origin.end_time,
-                published: origin.published,
+                end_time: to_model_opt(origin.end_time)?,
+                published: to_model_opt(origin.published)?,
                 summary: from_lax_array(origin.summary)?,
                 summary_map: match origin.summary_map {
                     None => HashMap::new(),
                     Some(item) => item,
                 },
-                updated: origin.updated,
+                updated: to_model_opt(origin.updated)?,
                 describes: boxed_to_model_opt(origin.describes)?,
             },
             actor_items: match (
@@ -254,7 +254,7 @@ impl ModelConv for model::Object {
             },
             tombstone_items: model::TombstoneItems {
                 former_type: from_lax_array(origin.former_type)?,
-                deleted: origin.deleted,
+                deleted: to_model_opt(origin.deleted)?,
             },
             question_items: model::QuestionItems {
                 one_of: from_lax_array(origin.one_of)?,
@@ -462,6 +462,18 @@ impl ModelConv for String {
     }
 }
 
+impl ModelConv for DateTime<Utc> {
+    type JsonSerdeValue = String;
+
+    fn from_model(self) -> Result<Self::JsonSerdeValue, Box<dyn Error>> {
+        Ok(self.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+    }
+
+    fn to_model(origin: Self::JsonSerdeValue) -> Result<Self, Box<dyn Error>> {
+        Ok(DateTime::parse_from_rfc3339(&origin)?.with_timezone(&Utc))
+    }
+}
+
 pub fn to_lax_array<T: ModelConv>(origin: Vec<T>) -> Result<Option<Value>, Box<dyn Error>> {
     match origin.len() {
         0 | 1 => {
@@ -595,12 +607,12 @@ pub struct Object {
     #[serde(rename = "mediaType")]
     media_type: Option<Value>,
     #[serde(rename = "endTime")]
-    end_time: Option<DateTime<Utc>>,
-    published: Option<DateTime<Utc>>,
+    end_time: Option<String>,
+    published: Option<String>,
     summary: Option<Value>,
     #[serde(rename = "summaryMap")]
     summary_map: Option<HashMap<String, String>>,
-    updated: Option<DateTime<Utc>>,
+    updated: Option<String>,
     describes: Option<Box<Object>>,
 
     // https://www.w3.org/ns/activitystreams#Actor
@@ -652,7 +664,7 @@ pub struct Object {
 
     // https://www.w3.org/ns/activitystreams#Tombstone
     former_type: Option<Value>,
-    deleted: Option<DateTime<Utc>>,
+    deleted: Option<String>,
 
     // https://www.w3.org/ns/activitystreams#Question
     #[serde(rename = "oneOf")]

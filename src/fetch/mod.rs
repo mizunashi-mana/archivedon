@@ -554,10 +554,19 @@ async fn fetch_outbox_activity<'a>(
     }
 
     for object_ref in &activity.activity_items.object {
-        fetch_outbox_object_ref(
+        let new_object = fetch_outbox_object_ref(
             env,
             account,
             object_ref,
+        ).await?;
+
+        let save_activity_path = format!("{}activity.json", &new_object.base_path);
+        save_outbox_activity(
+            env,
+            account,
+            &save_activity_path,
+            activity,
+            &new_object.object,
         ).await?;
     }
     Ok(())
@@ -567,7 +576,7 @@ async fn fetch_outbox_object_ref<'a>(
     env: &Env<'a>,
     account: &Account,
     object_ref: &ap_model::ObjectOrLink,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<NewObject, Box<dyn Error>> {
     match object_ref {
         ap_model::ObjectOrLink::Link(object_ref) => {
             let uri = object_ref.href.to_string();
@@ -588,11 +597,15 @@ async fn fetch_outbox_object_ref<'a>(
     }
 }
 
+struct NewObject {
+    base_path: String,
+    object: ap_model::Object
+}
 async fn save_outbox_object<'a>(
     env: &Env<'a>,
     account: &Account,
     object: &ap_model::Object,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<NewObject, Box<dyn Error>> {
     let id_re = Regex::new(r".*/(?<id>\d+)$").unwrap();
     let Some(caps) = (match &object.id {
         None => return Err(format!("Object ID should be available.").into()),
@@ -604,27 +617,58 @@ async fn save_outbox_object<'a>(
 
     let save_json_path = format!("{}entities/{id}.json", account.base_path);
     let new_object_url = env.static_base_url.join(&save_json_path)?;
+    let new_object = ap_model::Object {
+        schema_context: Some(ap_model::Context::object_default()),
+        id: Some(new_object_url.to_string()),
+        typ: object.typ.clone(),
+        object_items: ap_model::ObjectItems {
+            updated: Some(Utc::now()),
+            attachment: object.object_items.attachment.clone(),
+            attributed_to: object.object_items.attributed_to.clone(),
+            audience: object.object_items.audience.clone(),
+            bcc: object.object_items.bcc.clone(),
+            bto: object.object_items.bto.clone(),
+            cc: object.object_items.cc.clone(),
+            context: object.object_items.context.clone(),
+            generator: object.object_items.generator.clone(),
+            icon: object.object_items.icon.clone(),
+            image: object.object_items.image.clone(),
+            in_reply_to: object.object_items.in_reply_to.clone(),
+            location: object.object_items.location.clone(),
+            preview: object.object_items.preview.clone(),
+            replies: object.object_items.replies.clone(),
+            tag: object.object_items.tag.clone(),
+            to: object.object_items.to.clone(),
+            url: object.object_items.url.clone(),
+            content: object.object_items.content.clone(),
+            content_map: object.object_items.content_map.clone(),
+            name: object.object_items.name.clone(),
+            name_map: object.object_items.name_map.clone(),
+            duration: object.object_items.duration.clone(),
+            media_type: object.object_items.media_type.clone(),
+            end_time: object.object_items.end_time.clone(),
+            published: object.object_items.published.clone(),
+            summary: object.object_items.summary.clone(),
+            summary_map: object.object_items.summary_map.clone(),
+            describes: object.object_items.describes.clone(),
+        },
+        actor_items: object.actor_items.clone(),
+        activity_items: object.activity_items.clone(),
+        collection_items: object.collection_items.clone(),
+        ordered_collection_items: object.ordered_collection_items.clone(),
+        collection_page_items: object.collection_page_items.clone(),
+        ordered_collection_page_items: object.ordered_collection_page_items.clone(),
+        relationship_items: object.relationship_items.clone(),
+        tombstone_items: object.tombstone_items.clone(),
+        question_items: object.question_items.clone(),
+        place_items: object.place_items.clone(),
+        activity_streams_ext_items: object.activity_streams_ext_items.clone(),
+        mastodon_ext_items: object.mastodon_ext_items.clone(),
+        security_items: object.security_items.clone(),
+    };
     env.output.save_static_json_resource(
         &save_json_path,
-        &ap_model::Object {
-            schema_context: Some(ap_model::Context::object_default()),
-            id: Some(new_object_url.to_string()),
-            typ: object.typ.clone(),
-            object_items: object.object_items.clone(),
-            actor_items: object.actor_items.clone(),
-            activity_items: object.activity_items.clone(),
-            collection_items: object.collection_items.clone(),
-            ordered_collection_items: object.ordered_collection_items.clone(),
-            collection_page_items: object.collection_page_items.clone(),
-            ordered_collection_page_items: object.ordered_collection_page_items.clone(),
-            relationship_items: object.relationship_items.clone(),
-            tombstone_items: object.tombstone_items.clone(),
-            question_items: object.question_items.clone(),
-            place_items: object.place_items.clone(),
-            activity_streams_ext_items: object.activity_streams_ext_items.clone(),
-            mastodon_ext_items: object.mastodon_ext_items.clone(),
-            security_items: object.security_items.clone(),
-        }.from_model()?,
+        &new_object.clone().from_model()?,
     ).await?;
 
     let save_html_path = format!("{}entities/{id}.html", account.base_path);
@@ -655,5 +699,80 @@ async fn save_outbox_object<'a>(
         })?,
     ).await?;
 
-    Ok(())
+    Ok(NewObject {
+        base_path: format!("{}entities/{id}/", account.base_path),
+        object: new_object,
+    })
+}
+
+async fn save_outbox_activity<'a>(
+    env: &Env<'a>,
+    account: &Account,
+    new_activity_path: &str,
+    original_activity: &ap_model::Object,
+    new_object: &ap_model::Object,
+) -> Result<(), Box<dyn Error>> {
+    let new_activity_url = env.static_base_url.join(new_activity_path)?;
+    env.output.save_static_json_resource(
+        new_activity_path,
+        &ap_model::Object {
+            schema_context: Some(ap_model::Context::object_default()),
+            id: Some(new_activity_url.to_string()),
+            typ: original_activity.typ.clone(),
+            object_items: ap_model::ObjectItems {
+                updated: Some(Utc::now()),
+                attachment: original_activity.object_items.attachment.clone(),
+                attributed_to: original_activity.object_items.attributed_to.clone(),
+                audience: original_activity.object_items.audience.clone(),
+                bcc: original_activity.object_items.bcc.clone(),
+                bto: original_activity.object_items.bto.clone(),
+                cc: original_activity.object_items.cc.clone(),
+                context: original_activity.object_items.context.clone(),
+                generator: original_activity.object_items.generator.clone(),
+                icon: original_activity.object_items.icon.clone(),
+                image: original_activity.object_items.image.clone(),
+                in_reply_to: original_activity.object_items.in_reply_to.clone(),
+                location: original_activity.object_items.location.clone(),
+                preview: original_activity.object_items.preview.clone(),
+                replies: original_activity.object_items.replies.clone(),
+                tag: original_activity.object_items.tag.clone(),
+                to: original_activity.object_items.to.clone(),
+                url: original_activity.object_items.url.clone(),
+                content: original_activity.object_items.content.clone(),
+                content_map: original_activity.object_items.content_map.clone(),
+                name: original_activity.object_items.name.clone(),
+                name_map: original_activity.object_items.name_map.clone(),
+                duration: original_activity.object_items.duration.clone(),
+                media_type: original_activity.object_items.media_type.clone(),
+                end_time: original_activity.object_items.end_time.clone(),
+                published: original_activity.object_items.published.clone(),
+                summary: original_activity.object_items.summary.clone(),
+                summary_map: original_activity.object_items.summary_map.clone(),
+                describes: original_activity.object_items.describes.clone(),
+            },
+            actor_items: original_activity.actor_items.clone(),
+            activity_items: ap_model::ActivityItems {
+                actor: vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(account.actor_url.to_string()))],
+                instrument: vec![],
+                origin: match &original_activity.id {
+                    None => vec![],
+                    Some(item) => vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(item.to_string()))],
+                },
+                object: vec![ap_model::ObjectOrLink::Object(new_object.clone())],
+                result: vec![],
+                target: vec![],
+            },
+            collection_items: original_activity.collection_items.clone(),
+            ordered_collection_items: original_activity.ordered_collection_items.clone(),
+            collection_page_items: original_activity.collection_page_items.clone(),
+            ordered_collection_page_items: original_activity.ordered_collection_page_items.clone(),
+            relationship_items: original_activity.relationship_items.clone(),
+            tombstone_items: original_activity.tombstone_items.clone(),
+            question_items: original_activity.question_items.clone(),
+            place_items: original_activity.place_items.clone(),
+            activity_streams_ext_items: original_activity.activity_streams_ext_items.clone(),
+            mastodon_ext_items: original_activity.mastodon_ext_items.clone(),
+            security_items: original_activity.security_items.clone(),
+        }.from_model()?,
+    ).await
 }
