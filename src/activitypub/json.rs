@@ -39,10 +39,7 @@ impl ModelConv for model::Object {
             };
 
         Ok(Object {
-            schema_context: match self.schema_context {
-                None => None,
-                Some(origin) => Some(origin.from_model()?),
-            },
+            schema_context: from_model_opt(self.schema_context)?,
             id: self.id,
             typ: to_lax_array(self.typ)?,
             attachment: to_lax_array(self.object_items.attachment)?,
@@ -58,10 +55,7 @@ impl ModelConv for model::Object {
             in_reply_to: to_lax_array(self.object_items.in_reply_to)?,
             location: to_lax_array(self.object_items.location)?,
             preview: to_lax_array(self.object_items.preview)?,
-            replies: match self.object_items.replies {
-                None => None,
-                Some(origin) => Some(Box::new(origin.from_model()?)),
-            },
+            replies: boxed_from_model_opt(self.object_items.replies)?,
             tag: to_lax_array(self.object_items.tag)?,
             to: to_lax_array(self.object_items.to)?,
             url: match self.object_items.url {
@@ -105,10 +99,7 @@ impl ModelConv for model::Object {
                 Some(self.object_items.summary_map)
             },
             updated: self.object_items.updated,
-            describes: match self.object_items.describes {
-                None => None,
-                Some(origin) => Some(Box::new(origin.from_model()?)),
-            },
+            describes: boxed_from_model_opt(self.object_items.describes)?,
             inbox,
             outbox,
             followers,
@@ -122,37 +113,16 @@ impl ModelConv for model::Object {
             result: to_lax_array(self.activity_items.result)?,
             target: to_lax_array(self.activity_items.target)?,
             total_items: self.collection_items.total_items,
-            current: match self.collection_items.current {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
-            first: match self.collection_items.first {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
-            last: match self.collection_items.last {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
+            current: boxed_from_model_opt(self.collection_items.current)?,
+            first: boxed_from_model_opt(self.collection_items.first)?,
+            last: boxed_from_model_opt(self.collection_items.last)?,
             items: to_lax_array(self.collection_items.items)?,
             ordered_items: to_lax_array(self.ordered_collection_items.ordered_items)?,
-            next: match self.collection_page_items.next {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
-            prev: match self.collection_page_items.prev {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
-            part_of: match self.collection_page_items.part_of {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
+            next: boxed_from_model_opt(self.collection_page_items.next)?,
+            prev: boxed_from_model_opt(self.collection_page_items.prev)?,
+            part_of: boxed_from_model_opt(self.collection_page_items.part_of)?,
             start_index: self.ordered_collection_page_items.start_index,
-            subject: match self.relationship_items.subject {
-                None => None,
-                Some(item) => Some(Box::new(item.from_model()?)),
-            },
+            subject: boxed_from_model_opt(self.relationship_items.subject)?,
             relationship: to_lax_array(self.relationship_items.relationship)?,
             former_type: to_lax_array(self.tombstone_items.former_type)?,
             deleted: self.tombstone_items.deleted,
@@ -175,19 +145,13 @@ impl ModelConv for model::Object {
             discoverable: self.mastodon_ext_items.discoverable,
             suspended: self.mastodon_ext_items.suspended,
             devices: self.mastodon_ext_items.devices,
-            public_key: match self.security_items.public_key {
-                None => None,
-                Some(item) => Some(item.from_model()?),
-            },
+            public_key: from_model_opt(self.security_items.public_key)?,
         })
     }
 
     fn to_model(origin: Self::JsonSerdeValue) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
-            schema_context: match origin.schema_context {
-                None => None,
-                Some(item) => Some(model::Context::to_model(item)?),
-            },
+            schema_context: to_model_opt(origin.schema_context)?,
             id: origin.id,
             typ: from_lax_array(origin.typ)?,
             object_items: model::ObjectItems {
@@ -204,25 +168,12 @@ impl ModelConv for model::Object {
                 in_reply_to: from_lax_array(origin.in_reply_to)?,
                 location: from_lax_array(origin.location)?,
                 preview: from_lax_array(origin.preview)?,
-                replies: match origin.replies {
-                    None => None,
-                    Some(item) => Some(Box::new(model::Object::to_model(*item)?)),
-                },
+                replies: boxed_to_model_opt(origin.replies)?,
                 tag: from_lax_array(origin.tag)?,
                 to: from_lax_array(origin.to)?,
                 url: match origin.url {
                     None => None,
-                    Some(Value::String(item)) => Some(model::Link {
-                        href: item,
-                        schema_context: None,
-                        id: None,
-                        typ: vec![],
-                        height: None,
-                        hreflang: None,
-                        media_type: vec![],
-                        rel: vec![],
-                        width: None,
-                    }),
+                    Some(Value::String(item)) => Some(model::Link::from(item)),
                     Some(item) => {
                         let item: Link = serde_json::from_value(item)?;
                         Some(model::Link::to_model(item)?)
@@ -248,10 +199,7 @@ impl ModelConv for model::Object {
                     Some(item) => item,
                 },
                 updated: origin.updated,
-                describes: match origin.describes {
-                    None => None,
-                    Some(item) => Some(Box::new(model::Object::to_model(*item)?)),
-                },
+                describes: boxed_to_model_opt(origin.describes)?,
             },
             actor_items: match (
                 origin.inbox,
@@ -284,45 +232,24 @@ impl ModelConv for model::Object {
             },
             collection_items: model::CollectionItems {
                 total_items: origin.total_items,
-                current: match origin.current {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
-                first: match origin.first {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
-                last: match origin.last {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
+                current: boxed_to_model_opt(origin.current)?,
+                first: boxed_to_model_opt(origin.first)?,
+                last: boxed_to_model_opt(origin.last)?,
                 items: from_lax_array(origin.items)?,
             },
             ordered_collection_items: model::OrderedCollectionItems {
                 ordered_items: from_lax_array(origin.ordered_items)?,
             },
             collection_page_items: model::CollectionPageItems {
-                next: match origin.next {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
-                prev: match origin.prev {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
-                part_of: match origin.part_of {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
+                next: boxed_to_model_opt(origin.next)?,
+                prev: boxed_to_model_opt(origin.prev)?,
+                part_of: boxed_to_model_opt(origin.part_of)?,
             },
             ordered_collection_page_items: model::OrderedCollectionPageItems {
                 start_index: origin.start_index,
             },
             relationship_items: model::RelationshipItems {
-                subject: match origin.subject {
-                    None => None,
-                    Some(item) => Some(model::ObjectOrLink::to_model(*item)?),
-                },
+                subject: boxed_to_model_opt(origin.subject)?,
                 relationship: from_lax_array(origin.relationship)?,
             },
             tombstone_items: model::TombstoneItems {
@@ -355,10 +282,7 @@ impl ModelConv for model::Object {
                 devices: origin.devices,
             },
             security_items: model::SecurityItems {
-                public_key: match origin.public_key {
-                    None => None,
-                    Some(item) => Some(model::Key::to_model(item)?),
-                },
+                public_key: to_model_opt(origin.public_key)?,
             },
         })
     }
@@ -369,10 +293,7 @@ impl ModelConv for model::Link {
 
     fn from_model(self) -> Result<Self::JsonSerdeValue, Box<dyn Error>> {
         Ok(Link {
-            schema_context: match self.schema_context {
-                None => None,
-                Some(item) => Some(item.from_model()?),
-            },
+            schema_context: from_model_opt(self.schema_context)?,
             id: self.id,
             typ: to_lax_array(self.typ)?,
             href: self.href,
@@ -386,10 +307,7 @@ impl ModelConv for model::Link {
 
     fn to_model(origin: Self::JsonSerdeValue) -> Result<Self, Box<dyn Error>> {
         Ok(model::Link {
-            schema_context: match origin.schema_context {
-                None => None,
-                Some(item) => Some(model::Context::to_model(item)?),
-            },
+            schema_context: to_model_opt(origin.schema_context)?,
             id: origin.id,
             typ: from_lax_array(origin.typ)?,
             href: origin.href,
@@ -429,20 +347,8 @@ impl ModelConv for model::ObjectOrLink {
     fn to_model(origin: Self::JsonSerdeValue) -> Result<Self, Box<dyn Error>> {
         match origin {
             ObjectOrLink::Link(origin) => Ok(Self::Link(model::Link::to_model(origin)?)),
-            ObjectOrLink::Uri(origin) => Ok(Self::Link(model::Link {
-                schema_context: None,
-                id: None,
-                typ: vec![],
-                href: origin,
-                height: None,
-                hreflang: None,
-                media_type: vec![],
-                rel: vec![],
-                width: None,
-            })),
-            ObjectOrLink::Object(origin) => {
-                Ok(Self::Object(Box::new(model::Object::to_model(origin)?)))
-            }
+            ObjectOrLink::Uri(origin) => Ok(Self::Link(model::Link::from(origin))),
+            ObjectOrLink::Object(origin) => Ok(Self::Object(model::Object::to_model(origin)?)),
         }
     }
 }
@@ -532,6 +438,18 @@ impl ModelConv for model::Key {
     }
 }
 
+impl<T: ModelConv> ModelConv for Box<T> {
+    type JsonSerdeValue = T::JsonSerdeValue;
+
+    fn from_model(self) -> Result<Self::JsonSerdeValue, Box<dyn Error>> {
+        (*self).from_model()
+    }
+
+    fn to_model(origin: Self::JsonSerdeValue) -> Result<Self, Box<dyn Error>> {
+        Ok(Box::new(T::to_model(origin)?))
+    }
+}
+
 impl ModelConv for String {
     type JsonSerdeValue = String;
 
@@ -577,6 +495,34 @@ pub fn from_lax_array<T: ModelConv>(origin: Option<Value>) -> Result<Vec<T>, Box
                 Ok(vec![T::to_model(serde_json::from_value(origin)?)?])
             }
         }
+    }
+}
+
+pub fn from_model_opt<T: ModelConv>(origin: Option<T>) -> Result<Option<T::JsonSerdeValue>, Box<dyn Error>> {
+    match origin {
+        None => Ok(None),
+        Some(origin) => Ok(Some(origin.from_model()?)),
+    }
+}
+
+pub fn to_model_opt<T: ModelConv>(origin: Option<T::JsonSerdeValue>) -> Result<Option<T>, Box<dyn Error>> {
+    match origin {
+        None => Ok(None),
+        Some(origin) => Ok(Some(T::to_model(origin)?)),
+    }
+}
+
+pub fn boxed_from_model_opt<T: ModelConv>(origin: Option<Box<T>>) -> Result<Option<Box<T::JsonSerdeValue>>, Box<dyn Error>> {
+    match origin {
+        None => Ok(None),
+        Some(origin) => Ok(Some(Box::new(origin.from_model()?))),
+    }
+}
+
+pub fn boxed_to_model_opt<T: ModelConv>(origin: Option<Box<T::JsonSerdeValue>>) -> Result<Option<Box<T>>, Box<dyn Error>> {
+    match origin {
+        None => Ok(None),
+        Some(origin) => Ok(Some(Box::new(T::to_model(*origin)?))),
     }
 }
 

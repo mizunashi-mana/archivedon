@@ -6,30 +6,38 @@ mod input;
 mod output;
 mod templates;
 mod webfinger;
+mod env;
 
 use archivedon::activitypub::json::ModelConv;
 use archivedon::activitypub::model as ap_model;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
+use chrono::Utc;
 use output::Output;
 use serde_json::json;
 use url::Url;
+use regex::Regex;
 
+use self::env::Env;
 use self::templates::{ProfileHtmlParams, Templates};
 
-pub async fn run(input_path: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
+pub async fn run(input_path: &str, output_path: &str, default_max_pages: usize) -> Result<(), Box<dyn Error>> {
     let input = input::load(input_path).await?;
     let client = reqwest::Client::new();
     let output_path_buf = tokio::fs::canonicalize(output_path).await?;
     let output = Output::create(output_path_buf).await?;
     let templates = Templates::create()?;
 
-    let static_base_url = Url::parse(&input.static_base_url)?;
-    let predef_urls = save_predefs(&output, &static_base_url).await?;
+    let env = Env {
+        default_max_pages,
+        static_base_url: Url::parse(&input.static_base_url)?,
+    };
+
+    let predef_urls = save_predefs(&output, &env.static_base_url).await?;
 
     for account in input.accounts {
         fetch_account(
             &client,
-            &static_base_url,
+            &env,
             &output,
             &predef_urls,
             &account,
@@ -41,28 +49,39 @@ pub async fn run(input_path: &str, output_path: &str) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-pub struct PredefUrls {
+struct PredefUrls {
     inbox_url: Url,
     empty_collection_url: Url,
     empty_ordered_collection_url: Url,
 }
 
-pub async fn fetch_account<'a>(
+#[derive(Debug)]
+struct Account {
+    username: String,
+    domain: String,
+}
+
+async fn fetch_account<'a>(
     client: &reqwest::Client,
-    static_base_url: &Url,
+    env: &Env,
     output: &Output,
     predef_urls: &PredefUrls,
     account: &str,
     templates: &Templates<'a>,
 ) -> Result<(), Box<dyn Error>> {
     let account_stripped = account.strip_prefix("@").unwrap_or(&account);
-    let (username, domain) = match account_stripped.split_once("@") {
+    let account = match account_stripped.split_once("@") {
         None => return Err(format!("Illegal account: {account}").into()),
-        Some(x) => x,
+        Some((username, domain)) => Account {
+            username: username.to_string(),
+            domain: domain.to_string(),
+        },
     };
 
-    let subject = format!("acct:{username}@{domain}");
-    let account_actor_url = webfinger::fetch_ap_account_actor_url(client, domain, &subject).await?;
+    let account_ident = format!("{}@{}", &account.username, &account.domain);
+    let subject = format!("acct:{}", account_ident);
+
+    let account_actor_url = webfinger::fetch_ap_account_actor_url(client, &account.domain, &subject).await?;
     let account_actor = activitypub::fetch_actor(client, account_actor_url).await?;
 
     if !account_actor
@@ -70,20 +89,31 @@ pub async fn fetch_account<'a>(
         .suspended
         .is_some_and(|x| x)
     {
-        println!("Warning: account={account} is not suspended.");
+        println!("Warning: account={account:?} is not suspended.");
     }
 
-    let ap_resource_path = format!("users/{domain}/{username}.json");
-    let profile_path = format!("users/{domain}/{username}.html");
+    let ap_resource_path = format!("users/{}/{}.json", account.domain, account.username);
+    let profile_path = format!("users/{}/{}.html", account.domain, account.username);
+    let user_resource_path_base = format!("users/{}/{}/", account.domain, account.username);
 
-    let ap_resource_url = static_base_url.join(&ap_resource_path)?;
-    let profile_url = static_base_url.join(&profile_path)?;
+    let ap_resource_url = env.static_base_url.join(&ap_resource_path)?;
+    let profile_url = env.static_base_url.join(&profile_path)?;
 
     save_webfinger_resource(output, &ap_resource_url, &profile_url, subject).await?;
 
+    for actor_items in &account_actor.actor_items {
+        fetch_outbox_collection_ref(
+            env,
+            client,
+            output,
+            &user_resource_path_base,
+            &ap_model::ObjectOrLink::Link(ap_model::Link::from(actor_items.outbox.as_str())),
+        ).await?;
+    }
+
     save_profile_resource(
         output,
-        format!("{username}@{domain}"),
+        account_ident,
         &profile_path,
         &ap_resource_url,
         &account_actor,
@@ -203,11 +233,15 @@ async fn save_profile_resource<'a>(
         .save_static_text_resource(
             profile_path,
             &templates.render_profile_html(&ProfileHtmlParams {
+                typ: original_actor.typ.first().cloned(),
                 account,
                 actor_url: ap_resource_url.to_string(),
                 name: original_actor.object_items.name.first().cloned(),
                 summary: original_actor.object_items.summary.first().cloned(),
-                url: moved_profile_url.to_owned(),
+                url: match &original_actor.object_items.url {
+                    None => None,
+                    Some(item) => Some(item.href.to_string())
+                },
                 moved_to: original_actor
                     .activity_streams_ext_items
                     .moved_to
@@ -227,7 +261,6 @@ async fn save_actor_resource(
     profile_url: &Url,
 ) -> Result<(), Box<dyn Error>> {
     actor.id = Some(ap_resource_url.to_string());
-    actor.mastodon_ext_items.suspended = Some(true);
     actor.object_items.url = Some(ap_model::Link {
         href: profile_url.to_string(),
         schema_context: None,
@@ -239,6 +272,8 @@ async fn save_actor_resource(
         rel: vec![],
         width: None,
     });
+    actor.object_items.updated = Some(Utc::now());
+    actor.mastodon_ext_items.suspended = Some(true);
     actor.mastodon_ext_items.featured = Some(predef_urls.empty_ordered_collection_url.to_string());
     actor.mastodon_ext_items.featured_tags = Some(predef_urls.empty_collection_url.to_string());
     actor.mastodon_ext_items.devices = Some(predef_urls.empty_collection_url.to_string());
@@ -257,4 +292,271 @@ async fn save_actor_resource(
     output
         .save_static_json_resource(ap_resource_path, &actor.from_model()?)
         .await
+}
+
+async fn fetch_outbox_collection_ref(
+    env: &Env,
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    collection_ref: &ap_model::ObjectOrLink,
+) -> Result<(), Box<dyn Error>> {
+    match collection_ref {
+        ap_model::ObjectOrLink::Link(collection_ref) => {
+            let collection = activitypub::fetch_object(client, collection_ref.href.to_string()).await?;
+            fetch_outbox_collection(
+                env,
+                client,
+                output,
+                user_resource_path_base,
+                &collection,
+            ).await
+        }
+        ap_model::ObjectOrLink::Object(collection) => {
+            fetch_outbox_collection(
+                env,
+                client,
+                output,
+                user_resource_path_base,
+                collection,
+            ).await
+        }
+    }
+}
+
+async fn fetch_outbox_collection(
+    env: &Env,
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    collection: &ap_model::Object,
+) -> Result<(), Box<dyn Error>> {
+    for item in &collection.collection_items.items {
+        fetch_outbox_activity_ref(
+            client,
+            output,
+            user_resource_path_base,
+            item,
+        ).await?;
+    }
+
+    for item in &collection.ordered_collection_items.ordered_items {
+        fetch_outbox_activity_ref(
+            client,
+            output,
+            user_resource_path_base,
+            item,
+        ).await?;
+    }
+
+    if {
+        !collection.collection_items.items.is_empty() ||
+        !collection.ordered_collection_items.ordered_items.is_empty() ||
+        collection.collection_items.total_items == Some(0)
+    } {
+        return Ok(())
+    }
+
+    match &collection.collection_items.first {
+        None => Ok(()),
+        Some(init_collection_page_ref) => fetch_outbox_collection_pages(
+            client,
+            output,
+            collection.collection_items.total_items.unwrap_or(env.default_max_pages),
+            user_resource_path_base,
+            init_collection_page_ref,
+        ).await
+    }
+}
+
+async fn fetch_outbox_collection_pages(
+    client: &reqwest::Client,
+    output: &Output,
+    max_pages_count: usize,
+    user_resource_path_base: &str,
+    init_collection_page_ref: &ap_model::ObjectOrLink,
+) -> Result<(), Box<dyn Error>> {
+    let result = fetch_outbox_collection_pages_in_object_and_fetch_next(
+        max_pages_count,
+        client,
+        output,
+        user_resource_path_base,
+        init_collection_page_ref,
+    ).await?;
+
+    let mut next_page_opt = result.next_page_opt;
+    let mut max_pages_count = max_pages_count - result.fetched_pages_count;
+    while let Some(next_page) = next_page_opt {
+        let result = fetch_outbox_collection_pages_in_object_and_fetch_next(
+            max_pages_count,
+            client,
+            output,
+            user_resource_path_base,
+            &ap_model::ObjectOrLink::Object(next_page),
+        ).await?;
+
+        next_page_opt = result.next_page_opt;
+        max_pages_count -= result.fetched_pages_count;
+    }
+
+    Ok(())
+}
+
+struct FetchNextCollectionPageResult {
+    next_page_opt: Option<ap_model::Object>,
+    fetched_pages_count: usize,
+}
+async fn fetch_outbox_collection_pages_in_object_and_fetch_next(
+    max_pages_count: usize,
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    collection_page_ref: &ap_model::ObjectOrLink,
+) -> Result<FetchNextCollectionPageResult, Box<dyn Error>> {
+    let mut collection_page_ref = collection_page_ref;
+    let mut fetched_pages_count: usize = 0;
+    loop {
+        if fetched_pages_count >= max_pages_count {
+            return Ok(FetchNextCollectionPageResult {
+                next_page_opt: None,
+                fetched_pages_count,
+            });
+        }
+
+        match collection_page_ref {
+            ap_model::ObjectOrLink::Link(collection_page_ref) => {
+                let next_page_uri = collection_page_ref.href.to_string();
+                let next_page = activitypub::fetch_object(client, next_page_uri).await?;
+                return Ok(FetchNextCollectionPageResult {
+                    next_page_opt: Some(next_page),
+                    fetched_pages_count: fetched_pages_count + 1,
+                })
+            }
+            ap_model::ObjectOrLink::Object(collection_page) => {
+                for item in &collection_page.collection_items.items {
+                    fetch_outbox_activity_ref(
+                        client,
+                        output,
+                        user_resource_path_base,
+                        item,
+                    ).await?;
+                }
+
+                for item in &collection_page.ordered_collection_items.ordered_items {
+                    fetch_outbox_activity_ref(
+                        client,
+                        output,
+                        user_resource_path_base,
+                        item,
+                    ).await?;
+                }
+
+                match &collection_page.collection_page_items.next {
+                    None => {
+                        return Ok(FetchNextCollectionPageResult {
+                            next_page_opt: None,
+                            fetched_pages_count,
+                        });
+                    }
+                    Some(next_collection_page_ref) => {
+                        collection_page_ref = next_collection_page_ref;
+                        fetched_pages_count += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn fetch_outbox_activity_ref(
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    activity_ref: &ap_model::ObjectOrLink,
+) -> Result<(), Box<dyn Error>> {
+    match activity_ref {
+        ap_model::ObjectOrLink::Link(activity_ref) => {
+            let uri = activity_ref.href.to_string();
+            let activity = activitypub::fetch_object(client, uri).await?;
+            fetch_outbox_activity(
+                client,
+                output,
+                user_resource_path_base,
+                &activity,
+            ).await
+        }
+        ap_model::ObjectOrLink::Object(activity) => {
+            fetch_outbox_activity(
+                client,
+                output,
+                user_resource_path_base,
+                activity,
+            ).await
+        }
+    }
+}
+
+async fn fetch_outbox_activity(
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    activity: &ap_model::Object,
+) -> Result<(), Box<dyn Error>> {
+    for object_ref in &activity.activity_items.object {
+        fetch_outbox_object_ref(
+            client,
+            output,
+            user_resource_path_base,
+            object_ref,
+        ).await?;
+    }
+    Ok(())
+}
+
+async fn fetch_outbox_object_ref(
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    object_ref: &ap_model::ObjectOrLink,
+) -> Result<(), Box<dyn Error>> {
+    match object_ref {
+        ap_model::ObjectOrLink::Link(object_ref) => {
+            let uri = object_ref.href.to_string();
+            let object = activitypub::fetch_object(client, uri).await?;
+            fetch_outbox_object(
+                client,
+                output,
+                user_resource_path_base,
+                &object,
+            ).await
+        }
+        ap_model::ObjectOrLink::Object(object) => {
+            fetch_outbox_object(
+                client,
+                output,
+                user_resource_path_base,
+                object,
+            ).await
+        }
+    }
+}
+
+async fn fetch_outbox_object(
+    client: &reqwest::Client,
+    output: &Output,
+    user_resource_path_base: &str,
+    object: &ap_model::Object,
+) -> Result<(), Box<dyn Error>> {
+    let id_re = Regex::new(r".*/(?<id>\d+)$").unwrap();
+    let Some(caps) = (match &object.id {
+        None => return Err(format!("Object ID should be available.").into()),
+        Some(x) => id_re.captures(x),
+    }) else {
+        return Err(format!("The format of object ID is not supported.").into())
+    };
+    let id = &caps["id"];
+
+    todo!();
+
+    Ok(())
 }

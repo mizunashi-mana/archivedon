@@ -7,6 +7,7 @@ pub const TEMPLATE_PROFILE_HTML_KEY: &str = "PROFILE_HTML";
 
 #[derive(Serialize, Deserialize)]
 pub struct ProfileHtmlParams {
+    pub typ: Option<String>,
     pub account: String,
     pub actor_url: String,
     pub name: Option<String>,
@@ -35,7 +36,7 @@ impl<'a> Templates<'a> {
             "<meta content=\"{{account}}\" property=\"profile:username\">",
             "</head>",
             "<body>",
-            "<h1>Archived User: {{account}}</h1>",
+            "<h1>Archived {{typ}}: {{account}}</h1>",
             "<dl>",
             "{{#if moved_to}}{{#if moved_profile_url}}",
             "<dt>Moved To</dt><dd><a href=\"{{moved_profile_url}}\">{{moved_to}}</a></dd>",

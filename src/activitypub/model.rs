@@ -108,9 +108,9 @@ impl Object {
         id: Option<String>,
         typ: Vec<String>,
         total_items: Option<usize>,
-        current: Option<ObjectOrLink>,
-        first: Option<ObjectOrLink>,
-        last: Option<ObjectOrLink>,
+        current: Option<Box<ObjectOrLink>>,
+        first: Option<Box<ObjectOrLink>>,
+        last: Option<Box<ObjectOrLink>>,
         items: Vec<ObjectOrLink>,
         ordered_items: Vec<ObjectOrLink>,
     ) -> Self {
@@ -162,7 +162,7 @@ pub struct Link {
 #[derive(PartialEq, Debug)]
 pub enum ObjectOrLink {
     Link(Link),
-    Object(Box<Object>),
+    Object(Object),
 }
 
 /**
@@ -287,11 +287,11 @@ impl ActivityItems {
 pub struct CollectionItems {
     pub total_items: Option<usize>,
     // Range: CollectionPage | Link
-    pub current: Option<ObjectOrLink>,
+    pub current: Option<Box<ObjectOrLink>>,
     // Range: CollectionPage | Link
-    pub first: Option<ObjectOrLink>,
+    pub first: Option<Box<ObjectOrLink>>,
     // Range: CollectionPage | Link
-    pub last: Option<ObjectOrLink>,
+    pub last: Option<Box<ObjectOrLink>>,
     pub items: Vec<ObjectOrLink>,
 }
 
@@ -328,10 +328,10 @@ impl OrderedCollectionItems {
  */
 #[derive(PartialEq, Debug)]
 pub struct CollectionPageItems {
-    pub next: Option<ObjectOrLink>,
-    pub prev: Option<ObjectOrLink>,
+    pub next: Option<Box<ObjectOrLink>>,
+    pub prev: Option<Box<ObjectOrLink>>,
     // Range: Link | Collection
-    pub part_of: Option<ObjectOrLink>,
+    pub part_of: Option<Box<ObjectOrLink>>,
 }
 
 impl CollectionPageItems {
@@ -363,7 +363,7 @@ impl OrderedCollectionPageItems {
  */
 #[derive(PartialEq, Debug)]
 pub struct RelationshipItems {
-    pub subject: Option<ObjectOrLink>,
+    pub subject: Option<Box<ObjectOrLink>>,
     pub relationship: Vec<Object>,
 }
 

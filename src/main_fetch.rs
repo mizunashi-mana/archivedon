@@ -13,13 +13,15 @@ struct Cli {
     input: String,
     #[arg(short, long)]
     output: String,
+    #[arg(long, default_value_t = 1000)]
+    default_max_pages: usize,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    fetch::run(&cli.input, &cli.output).await?;
+    fetch::run(&cli.input, &cli.output, cli.default_max_pages).await?;
 
     Ok(())
 }

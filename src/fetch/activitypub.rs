@@ -17,6 +17,15 @@ pub async fn fetch_actor(
     }
 }
 
+pub async fn fetch_object(
+    client: &reqwest::Client,
+    uri: String,
+) -> Result<ap_model::Object, Box<dyn Error>> {
+    let object: ap_model::Object =
+        ap_json::ModelConv::to_model(fetch_ap_resource(client, uri).await?)?;
+    Ok(object)
+}
+
 pub async fn fetch_ap_resource<T: DeserializeOwned>(
     client: &reqwest::Client,
     uri: String,
