@@ -6,7 +6,7 @@ use serde_json::Value;
 /**
  * Schema: https://www.w3.org/TR/json-ld/#the-context
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Context {
     Single(Iri),
     Mix(Vec<Context>),
@@ -72,7 +72,7 @@ impl Context {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Iri {
     Direct(String),
     TypeCoercion { id: String, typ: Option<String> },
@@ -81,7 +81,7 @@ pub enum Iri {
 /**
  * Reference: https://www.w3.org/ns/activitystreams
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Object {
     pub schema_context: Option<Context>,
     pub id: Option<String>,
@@ -145,7 +145,7 @@ impl Object {
 /**
  * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#dfn-link
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Link {
     pub schema_context: Option<Context>,
     pub id: Option<String>,
@@ -159,7 +159,7 @@ pub struct Link {
     pub width: Option<usize>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum ObjectOrLink {
     Link(Link),
     Object(Object),
@@ -168,7 +168,7 @@ pub enum ObjectOrLink {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Object
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct ObjectItems {
     pub attachment: Vec<ObjectOrLink>,
     pub attributed_to: Vec<ObjectOrLink>,
@@ -244,7 +244,7 @@ impl ObjectItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Actor
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct ActorItems {
     pub inbox: String,
     pub outbox: String,
@@ -257,7 +257,7 @@ pub struct ActorItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Activity
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct ActivityItems {
     pub actor: Vec<ObjectOrLink>,
     pub instrument: Vec<ObjectOrLink>,
@@ -283,7 +283,7 @@ impl ActivityItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Collection
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct CollectionItems {
     pub total_items: Option<usize>,
     // Range: CollectionPage | Link
@@ -310,7 +310,7 @@ impl CollectionItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#OrderedCollection
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct OrderedCollectionItems {
     pub ordered_items: Vec<ObjectOrLink>,
 }
@@ -326,7 +326,7 @@ impl OrderedCollectionItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#CollectionPage
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct CollectionPageItems {
     pub next: Option<Box<ObjectOrLink>>,
     pub prev: Option<Box<ObjectOrLink>>,
@@ -347,7 +347,7 @@ impl CollectionPageItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#OrderedCollectionPage
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct OrderedCollectionPageItems {
     pub start_index: Option<usize>,
 }
@@ -361,7 +361,7 @@ impl OrderedCollectionPageItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Relationship
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RelationshipItems {
     pub subject: Option<Box<ObjectOrLink>>,
     pub relationship: Vec<Object>,
@@ -379,7 +379,7 @@ impl RelationshipItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Tombstone
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct TombstoneItems {
     pub former_type: Vec<Object>,
     pub deleted: Option<DateTime<Utc>>,
@@ -397,7 +397,7 @@ impl TombstoneItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Question
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct QuestionItems {
     pub one_of: Vec<ObjectOrLink>,
     pub any_of: Vec<ObjectOrLink>,
@@ -418,7 +418,7 @@ impl QuestionItems {
 /**
  * Reference: https://www.w3.org/ns/activitystreams#Place
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct PlaceItems {
     pub accuracy: Option<f64>,
     pub altitude: Option<f64>,
@@ -444,7 +444,7 @@ impl PlaceItems {
 /**
  * Reference: https://docs.joinmastodon.org/spec/activitypub/#as
  */
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ActivityStreamExtItems {
     pub manually_approves_followers: Option<bool>,
     pub also_known_as: Vec<String>,
@@ -464,7 +464,7 @@ impl ActivityStreamExtItems {
 /**
  * Reference: https://docs.joinmastodon.org/spec/activitypub/#toot
  */
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct MastodonExtItems {
     // http://joinmastodon.org/ns#featured
     pub featured: Option<String>,
@@ -497,7 +497,7 @@ impl MastodonExtItems {
 /**
  * Reference: https://w3id.org/security/v1
  */
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct SecurityItems {
     pub public_key: Option<Key>,
 }
@@ -511,7 +511,7 @@ impl SecurityItems {
 /**
  * Reference: https://w3c.github.io/vc-data-integrity/vocab/security/vocabulary.html#Key
  */
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Key {
     pub id: String,
     pub owner: String,
