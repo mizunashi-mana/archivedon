@@ -13,6 +13,8 @@ struct Cli {
     input: String,
     #[arg(short, long)]
     output: String,
+    #[arg(long, default_value_t = false)]
+    fetch_outbox: bool,
     #[arg(long, default_value_t = 1000)]
     default_max_pages: usize,
 }
@@ -21,7 +23,7 @@ struct Cli {
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    fetch::run(&cli.input, &cli.output, cli.default_max_pages).await?;
+    fetch::run(&cli.input, &cli.output, cli.fetch_outbox, cli.default_max_pages).await?;
 
     Ok(())
 }

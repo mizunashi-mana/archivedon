@@ -104,6 +104,28 @@ pub struct Object {
 }
 
 impl Object {
+    pub fn clone_without_schema_context(&self) -> Self {
+        Self {
+            schema_context: None,
+            id: self.id.clone(),
+            typ: self.typ.clone(),
+            object_items: self.object_items.clone(),
+            actor_items: self.actor_items.clone(),
+            activity_items: self.activity_items.clone(),
+            collection_items: self.collection_items.clone(),
+            ordered_collection_items: self.ordered_collection_items.clone(),
+            collection_page_items: self.collection_page_items.clone(),
+            ordered_collection_page_items: self.ordered_collection_page_items.clone(),
+            relationship_items: self.relationship_items.clone(),
+            tombstone_items: self.tombstone_items.clone(),
+            question_items: self.question_items.clone(),
+            place_items: self.place_items.clone(),
+            activity_streams_ext_items: self.activity_streams_ext_items.clone(),
+            mastodon_ext_items: self.mastodon_ext_items.clone(),
+            security_items: self.security_items.clone(),
+        }
+    }
+
     pub fn new_collection(
         id: Option<String>,
         typ: Vec<String>,

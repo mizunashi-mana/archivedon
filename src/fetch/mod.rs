@@ -20,7 +20,12 @@ use regex::Regex;
 use self::env::Env;
 use self::templates::{ProfileHtmlParams, Templates, ObjectHtmlParams};
 
-pub async fn run(input_path: &str, output_path: &str, default_max_pages: usize) -> Result<(), Box<dyn Error>> {
+pub async fn run(
+    input_path: &str,
+    output_path: &str,
+    fetch_outbox: bool,
+    default_max_pages: usize,
+) -> Result<(), Box<dyn Error>> {
     let input = input::load(input_path).await?;
     let output_path_buf = tokio::fs::canonicalize(output_path).await?;
 
@@ -30,6 +35,7 @@ pub async fn run(input_path: &str, output_path: &str, default_max_pages: usize) 
         templates: Templates::create()?,
         default_max_pages,
         static_base_url: Url::parse(&input.static_base_url)?,
+        fetch_outbox,
     };
 
     let predef_urls = save_predefs(&env).await?;
@@ -122,12 +128,14 @@ async fn fetch_account<'a>(
         &account.profile_url,
     ).await?;
 
-    for actor_items in &account_actor.actor_items {
-        fetch_outbox_collection_ref(
-            env,
-            &account,
-            &ap_model::ObjectOrLink::Link(ap_model::Link::from(actor_items.outbox.as_str())),
-        ).await?;
+    if env.fetch_outbox {
+        for actor_items in &account_actor.actor_items {
+            fetch_outbox_collection_ref(
+                env,
+                &account,
+                &ap_model::ObjectOrLink::Link(ap_model::Link::from(actor_items.outbox.as_str())),
+            ).await?;
+        }
     }
 
     save_profile_resource(
@@ -510,7 +518,7 @@ async fn fetch_outbox_activity_ref<'a>(
     env: &Env<'a>,
     account: &Account,
     activity_ref: &ap_model::ObjectOrLink,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<ap_model::Object>, Box<dyn Error>> {
     match activity_ref {
         ap_model::ObjectOrLink::Link(activity_ref) => {
             let uri = activity_ref.href.to_string();
@@ -535,21 +543,24 @@ async fn fetch_outbox_activity<'a>(
     env: &Env<'a>,
     account: &Account,
     activity: &ap_model::Object,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<ap_model::Object>, Box<dyn Error>> {
+    let mut new_activities = vec![];
+
     {
-        let mut accepted_type_count = 0;
+        let mut accepted_type = false;
         for typ in &activity.typ {
             match typ.as_str() {
                 "Announce" => {
                     // do nothing
                 }
                 _ => {
-                    accepted_type_count += 1;
+                    accepted_type = true;
+                    break
                 }
             }
         }
-        if accepted_type_count == 0 {
-            return Ok(());
+        if !accepted_type {
+            return Ok(new_activities);
         }
     }
 
@@ -561,15 +572,18 @@ async fn fetch_outbox_activity<'a>(
         ).await?;
 
         let save_activity_path = format!("{}activity.json", &new_object.base_path);
-        save_outbox_activity(
+        let new_activity = save_outbox_activity(
             env,
             account,
             &save_activity_path,
             activity,
             &new_object.object,
         ).await?;
+
+        new_activities.push(new_activity);
     }
-    Ok(())
+
+    Ok(new_activities)
 }
 
 async fn fetch_outbox_object_ref<'a>(
@@ -711,68 +725,72 @@ async fn save_outbox_activity<'a>(
     new_activity_path: &str,
     original_activity: &ap_model::Object,
     new_object: &ap_model::Object,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<ap_model::Object, Box<dyn Error>> {
     let new_activity_url = env.static_base_url.join(new_activity_path)?;
+    let new_activity = ap_model::Object {
+        schema_context: Some(ap_model::Context::object_default()),
+        id: Some(new_activity_url.to_string()),
+        typ: original_activity.typ.clone(),
+        object_items: ap_model::ObjectItems {
+            updated: Some(Utc::now()),
+            attachment: original_activity.object_items.attachment.clone(),
+            attributed_to: original_activity.object_items.attributed_to.clone(),
+            audience: original_activity.object_items.audience.clone(),
+            bcc: original_activity.object_items.bcc.clone(),
+            bto: original_activity.object_items.bto.clone(),
+            cc: original_activity.object_items.cc.clone(),
+            context: original_activity.object_items.context.clone(),
+            generator: original_activity.object_items.generator.clone(),
+            icon: original_activity.object_items.icon.clone(),
+            image: original_activity.object_items.image.clone(),
+            in_reply_to: original_activity.object_items.in_reply_to.clone(),
+            location: original_activity.object_items.location.clone(),
+            preview: original_activity.object_items.preview.clone(),
+            replies: original_activity.object_items.replies.clone(),
+            tag: original_activity.object_items.tag.clone(),
+            to: original_activity.object_items.to.clone(),
+            url: original_activity.object_items.url.clone(),
+            content: original_activity.object_items.content.clone(),
+            content_map: original_activity.object_items.content_map.clone(),
+            name: original_activity.object_items.name.clone(),
+            name_map: original_activity.object_items.name_map.clone(),
+            duration: original_activity.object_items.duration.clone(),
+            media_type: original_activity.object_items.media_type.clone(),
+            end_time: original_activity.object_items.end_time.clone(),
+            published: original_activity.object_items.published.clone(),
+            summary: original_activity.object_items.summary.clone(),
+            summary_map: original_activity.object_items.summary_map.clone(),
+            describes: original_activity.object_items.describes.clone(),
+        },
+        actor_items: original_activity.actor_items.clone(),
+        activity_items: ap_model::ActivityItems {
+            actor: vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(account.actor_url.to_string()))],
+            instrument: vec![],
+            origin: match &original_activity.id {
+                None => vec![],
+                Some(item) => vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(item.to_string()))],
+            },
+            object: vec![ap_model::ObjectOrLink::Object(new_object.clone_without_schema_context())],
+            result: vec![],
+            target: vec![],
+        },
+        collection_items: original_activity.collection_items.clone(),
+        ordered_collection_items: original_activity.ordered_collection_items.clone(),
+        collection_page_items: original_activity.collection_page_items.clone(),
+        ordered_collection_page_items: original_activity.ordered_collection_page_items.clone(),
+        relationship_items: original_activity.relationship_items.clone(),
+        tombstone_items: original_activity.tombstone_items.clone(),
+        question_items: original_activity.question_items.clone(),
+        place_items: original_activity.place_items.clone(),
+        activity_streams_ext_items: original_activity.activity_streams_ext_items.clone(),
+        mastodon_ext_items: original_activity.mastodon_ext_items.clone(),
+        security_items: original_activity.security_items.clone(),
+    };
+
     env.output.save_static_json_resource(
         new_activity_path,
-        &ap_model::Object {
-            schema_context: Some(ap_model::Context::object_default()),
-            id: Some(new_activity_url.to_string()),
-            typ: original_activity.typ.clone(),
-            object_items: ap_model::ObjectItems {
-                updated: Some(Utc::now()),
-                attachment: original_activity.object_items.attachment.clone(),
-                attributed_to: original_activity.object_items.attributed_to.clone(),
-                audience: original_activity.object_items.audience.clone(),
-                bcc: original_activity.object_items.bcc.clone(),
-                bto: original_activity.object_items.bto.clone(),
-                cc: original_activity.object_items.cc.clone(),
-                context: original_activity.object_items.context.clone(),
-                generator: original_activity.object_items.generator.clone(),
-                icon: original_activity.object_items.icon.clone(),
-                image: original_activity.object_items.image.clone(),
-                in_reply_to: original_activity.object_items.in_reply_to.clone(),
-                location: original_activity.object_items.location.clone(),
-                preview: original_activity.object_items.preview.clone(),
-                replies: original_activity.object_items.replies.clone(),
-                tag: original_activity.object_items.tag.clone(),
-                to: original_activity.object_items.to.clone(),
-                url: original_activity.object_items.url.clone(),
-                content: original_activity.object_items.content.clone(),
-                content_map: original_activity.object_items.content_map.clone(),
-                name: original_activity.object_items.name.clone(),
-                name_map: original_activity.object_items.name_map.clone(),
-                duration: original_activity.object_items.duration.clone(),
-                media_type: original_activity.object_items.media_type.clone(),
-                end_time: original_activity.object_items.end_time.clone(),
-                published: original_activity.object_items.published.clone(),
-                summary: original_activity.object_items.summary.clone(),
-                summary_map: original_activity.object_items.summary_map.clone(),
-                describes: original_activity.object_items.describes.clone(),
-            },
-            actor_items: original_activity.actor_items.clone(),
-            activity_items: ap_model::ActivityItems {
-                actor: vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(account.actor_url.to_string()))],
-                instrument: vec![],
-                origin: match &original_activity.id {
-                    None => vec![],
-                    Some(item) => vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(item.to_string()))],
-                },
-                object: vec![ap_model::ObjectOrLink::Object(new_object.clone())],
-                result: vec![],
-                target: vec![],
-            },
-            collection_items: original_activity.collection_items.clone(),
-            ordered_collection_items: original_activity.ordered_collection_items.clone(),
-            collection_page_items: original_activity.collection_page_items.clone(),
-            ordered_collection_page_items: original_activity.ordered_collection_page_items.clone(),
-            relationship_items: original_activity.relationship_items.clone(),
-            tombstone_items: original_activity.tombstone_items.clone(),
-            question_items: original_activity.question_items.clone(),
-            place_items: original_activity.place_items.clone(),
-            activity_streams_ext_items: original_activity.activity_streams_ext_items.clone(),
-            mastodon_ext_items: original_activity.mastodon_ext_items.clone(),
-            security_items: original_activity.security_items.clone(),
-        }.from_model()?,
-    ).await
+        &new_activity.clone().from_model()?,
+    ).await?;
+
+    Ok(new_activity)
 }
