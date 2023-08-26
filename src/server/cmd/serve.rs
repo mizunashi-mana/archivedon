@@ -1,14 +1,19 @@
 use std::{
     error::Error,
     net::{IpAddr, SocketAddr},
+    path::Path,
 };
 use warp::Filter;
 
-use crate::server::env;
+use crate::server::env::Env;
 use crate::server::handler::webfinger;
 
-pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Error>> {
-    let env = env::env(vec!["localhost".to_string()]);
+pub async fn run(
+    addr_opt: &Option<String>,
+    port: u16,
+    resource_dir: &str,
+) -> Result<(), Box<dyn Error>> {
+    let env = Env::load(Path::new(resource_dir));
 
     let addr = match addr_opt {
         Some(addr_raw) => addr_raw.parse()?,
@@ -16,41 +21,20 @@ pub async fn run(addr_opt: &Option<String>, port: u16) -> Result<(), Box<dyn Err
     };
     let sock_addr = SocketAddr::new(addr, port);
 
+    let static_dir = env.resource_dir.join("static");
+
     let webfinger = warp::get()
         .and(warp::path!(".well-known" / "webfinger"))
         .map(move || env.clone())
         .and(warp::query::<Vec<(String, String)>>())
         .and_then(webfinger::handle);
 
-    let user = warp::get()
-        .and(warp::path!("users" / String))
-        .and(warp::header::exact("accept", "application/activity+json"))
-        .and_then(handle_user);
+    let static_resource = warp::path("static").and(warp::fs::dir(static_dir));
 
-    let user_redirect = warp::get()
-        .and(warp::path!("users" / String))
-        .and_then(handle_user_redirect);
-
-    let profile = warp::get()
-        .and(warp::path!(String))
-        .and_then(handle_profile);
-
-    let service = webfinger.or(user).or(user_redirect).or(profile);
+    let service = webfinger.or(static_resource);
 
     let (_, server) = warp::serve(service).try_bind_ephemeral(sock_addr)?;
     server.await;
 
     Ok(())
-}
-
-async fn handle_user(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    Ok(Box::new(format!("name={}", name)))
-}
-
-async fn handle_user_redirect(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    Ok(Box::new(format!("name={}", name)))
-}
-
-async fn handle_profile(name: String) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    Ok(Box::new(format!("name={}", name)))
 }

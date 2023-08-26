@@ -21,8 +21,11 @@ enum Commands {
         #[arg(long, env = "ADDR")]
         addr: Option<String>,
 
-        #[arg(long, env = "PORT")]
+        #[arg(short, long, env = "PORT")]
         port: u16,
+
+        #[arg(long, env = "RESOURCE_DIR")]
+        resource_dir: String,
     },
 }
 
@@ -31,7 +34,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Serve { addr, port, .. } => cmd::serve::run(addr, *port),
+        Commands::Serve {
+            addr,
+            port,
+            resource_dir,
+            ..
+        } => cmd::serve::run(addr, *port, resource_dir),
     }
     .await?;
 

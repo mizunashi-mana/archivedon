@@ -31,7 +31,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         cli.fetch_outbox,
         cli.default_max_pages,
         cli.page_items_count,
-    ).await?;
+    )
+    .await?;
 
     Ok(())
 }

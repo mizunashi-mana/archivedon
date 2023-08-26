@@ -1,4 +1,4 @@
-use std::{error::Error, collections::HashMap};
+use std::{collections::HashMap, error::Error};
 
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
@@ -105,10 +105,7 @@ impl<'a> Templates<'a> {
         Ok(self.handlebars.render(TEMPLATE_KEY_PROFILE_HTML, params)?)
     }
 
-    pub fn render_object_html(
-        &self,
-        params: &ObjectHtmlParams,
-    ) -> Result<String, Box<dyn Error>> {
+    pub fn render_object_html(&self, params: &ObjectHtmlParams) -> Result<String, Box<dyn Error>> {
         Ok(self.handlebars.render(TEMPLATE_KEY_OBJECT_HTML, params)?)
     }
 }

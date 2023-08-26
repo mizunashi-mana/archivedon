@@ -510,28 +510,36 @@ pub fn from_lax_array<T: ModelConv>(origin: Option<Value>) -> Result<Vec<T>, Box
     }
 }
 
-pub fn from_model_opt<T: ModelConv>(origin: Option<T>) -> Result<Option<T::JsonSerdeValue>, Box<dyn Error>> {
+pub fn from_model_opt<T: ModelConv>(
+    origin: Option<T>,
+) -> Result<Option<T::JsonSerdeValue>, Box<dyn Error>> {
     match origin {
         None => Ok(None),
         Some(origin) => Ok(Some(origin.from_model()?)),
     }
 }
 
-pub fn to_model_opt<T: ModelConv>(origin: Option<T::JsonSerdeValue>) -> Result<Option<T>, Box<dyn Error>> {
+pub fn to_model_opt<T: ModelConv>(
+    origin: Option<T::JsonSerdeValue>,
+) -> Result<Option<T>, Box<dyn Error>> {
     match origin {
         None => Ok(None),
         Some(origin) => Ok(Some(T::to_model(origin)?)),
     }
 }
 
-pub fn boxed_from_model_opt<T: ModelConv>(origin: Option<Box<T>>) -> Result<Option<Box<T::JsonSerdeValue>>, Box<dyn Error>> {
+pub fn boxed_from_model_opt<T: ModelConv>(
+    origin: Option<Box<T>>,
+) -> Result<Option<Box<T::JsonSerdeValue>>, Box<dyn Error>> {
     match origin {
         None => Ok(None),
         Some(origin) => Ok(Some(Box::new(origin.from_model()?))),
     }
 }
 
-pub fn boxed_to_model_opt<T: ModelConv>(origin: Option<Box<T::JsonSerdeValue>>) -> Result<Option<Box<T>>, Box<dyn Error>> {
+pub fn boxed_to_model_opt<T: ModelConv>(
+    origin: Option<Box<T::JsonSerdeValue>>,
+) -> Result<Option<Box<T>>, Box<dyn Error>> {
     match origin {
         None => Ok(None),
         Some(origin) => Ok(Some(Box::new(T::to_model(*origin)?))),

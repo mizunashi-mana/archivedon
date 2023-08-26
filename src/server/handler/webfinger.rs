@@ -5,19 +5,12 @@ use crate::server::env::Env;
 use crate::server::handler;
 
 pub async fn handle(
-    env: Arc<dyn Env>,
+    env: Arc<Env>,
     params: Vec<(String, String)>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     let params = QueryParams::parse(params)?;
 
-    if let Some(resource) = params.resource.strip_prefix("acct:") {
-        match resource.split_once('@') {
-            None => Ok(handler::bad_request()),
-            Some((username, domain)) => handle_account(env, username, domain, params.rel).await,
-        }
-    } else {
-        Ok(handler::bad_request())
-    }
+    handle_account(env, &params.resource, params.rel).await
 }
 
 #[derive(Debug)]
@@ -53,30 +46,47 @@ impl QueryParams {
 }
 
 async fn handle_account(
-    env: Arc<dyn Env>,
-    username: &str,
-    domain: &str,
+    env: Arc<Env>,
+    resource: &str,
     rel: Vec<String>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    if env.is_target_domain(domain) {
-        return Ok(handler::not_found());
+    let resource_path = env
+        .resource_dir
+        .join("webfinger")
+        .join(format!("{}.json", resource));
+
+    match tokio::fs::try_exists(&resource_path).await {
+        Ok(false) => return Ok(handler::not_found()),
+        Ok(true) => {
+            // do nothing
+        }
+        Err(_) => return Ok(handler::bad_request()),
     }
 
-    if username != "sample" {
-        return Ok(handler::not_found());
-    }
-
-    if !rel.is_empty() {
-        return Ok(handler::bad_request());
-    }
-
-    let result = webfinger::resource::Resource {
-        subject: format!("acct:{username}@{domain}"),
-        aliases: None,
-        properties: None,
-        links: None,
+    let resource = match tokio::fs::read(&resource_path).await {
+        Ok(x) => x,
+        Err(_) => return Ok(handler::bad_request()),
     };
-    let reply = warp::reply::json(&result);
+    let mut resource: webfinger::resource::Resource = match serde_json::from_slice(&resource) {
+        Ok(x) => x,
+        Err(_) => return Ok(handler::bad_request()),
+    };
+    if !rel.is_empty() {
+        resource.links = match resource.links {
+            None => None,
+            Some(links) => {
+                let mut dest = vec![];
+                for link in links {
+                    if rel.iter().any(|x| x == &link.rel) {
+                        dest.push(link);
+                    }
+                }
+                Some(dest)
+            }
+        }
+    }
+
+    let reply = warp::reply::json(&resource);
     let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
     let reply = warp::reply::with_header(reply, "Content-Type", "application/jrd+json");
 

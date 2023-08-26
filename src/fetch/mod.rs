@@ -2,23 +2,23 @@ use std::collections::HashMap;
 use std::error::Error;
 
 mod activitypub;
+mod env;
 mod input;
 mod output;
 mod templates;
 mod webfinger;
-mod env;
 
 use archivedon::activitypub::json::ModelConv;
 use archivedon::activitypub::model as ap_model;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
 use chrono::Utc;
 use output::Output;
+use regex::Regex;
 use serde_json::json;
 use url::Url;
-use regex::Regex;
 
 use self::env::Env;
-use self::templates::{ProfileHtmlParams, Templates, ObjectHtmlParams};
+use self::templates::{ObjectHtmlParams, ProfileHtmlParams, Templates};
 
 pub async fn run(
     input_path: &str,
@@ -43,12 +43,7 @@ pub async fn run(
     let predef_urls = save_predefs(&env).await?;
 
     for account in input.accounts {
-        fetch_account(
-            &env,
-            &predef_urls,
-            &account,
-        )
-        .await?;
+        fetch_account(&env, &predef_urls, &account).await?;
     }
 
     Ok(())
@@ -99,20 +94,13 @@ async fn fetch_account<'a>(
     let account_stripped = account.strip_prefix("@").unwrap_or(&account);
     let account = match account_stripped.split_once("@") {
         None => return Err(format!("Illegal account: {account}").into()),
-        Some((username, domain)) => Account::new(
-            username,
-            domain,
-            &env.static_base_url,
-        )?,
+        Some((username, domain)) => Account::new(username, domain, &env.static_base_url)?,
     };
 
     let subject = format!("acct:{}", account.ident);
 
-    let account_actor_url = webfinger::fetch_ap_account_actor_url(
-        &env.client,
-        &account.domain,
-        &subject,
-    ).await?;
+    let account_actor_url =
+        webfinger::fetch_ap_account_actor_url(&env.client, &account.domain, &subject).await?;
     let account_actor = activitypub::fetch_actor(&env.client, account_actor_url).await?;
 
     if !account_actor
@@ -128,32 +116,35 @@ async fn fetch_account<'a>(
         subject,
         &account.actor_url,
         &account.profile_url,
-    ).await?;
-
-    if env.fetch_outbox {
-        for actor_items in &account_actor.actor_items {
-            fetch_outbox_collection_ref(
-                env,
-                &account,
-                &ap_model::ObjectOrLink::Link(ap_model::Link::from(actor_items.outbox.as_str())),
-            ).await?;
-        }
-    }
-
-    save_profile_resource(
-        &env.output,
-        &account,
-        &account_actor,
-        &None,
-        &env.templates,
     )
     .await?;
+
+    let outbox_url_opt = if env.fetch_outbox {
+        match &account_actor.actor_items {
+            None => None,
+            Some(actor_items) => Some(
+                fetch_outbox_collection_ref(
+                    env,
+                    &account,
+                    &ap_model::ObjectOrLink::Link(ap_model::Link::from(
+                        actor_items.outbox.as_str(),
+                    )),
+                )
+                .await?,
+            ),
+        }
+    } else {
+        None
+    };
+
+    save_profile_resource(&env.output, &account, &account_actor, &None, &env.templates).await?;
 
     save_actor_resource(
         &env.output,
         &account,
         account_actor,
         predef_urls,
+        outbox_url_opt,
     )
     .await?;
 
@@ -191,9 +182,7 @@ async fn save_webfinger_resource(
     Ok(())
 }
 
-async fn save_predefs<'a>(
-    env: &Env<'a>,
-) -> Result<PredefUrls, Box<dyn Error>> {
+async fn save_predefs<'a>(env: &Env<'a>) -> Result<PredefUrls, Box<dyn Error>> {
     let inbox_path = "predef/inbox.json";
     let empty_collection_path = "predef/empty-collection.json";
     let empty_ordered_collection_path = "predef/empty-ordered-collection.json";
@@ -264,7 +253,7 @@ async fn save_profile_resource<'a>(
                 summary_map: original_actor.object_items.summary_map.clone(),
                 url: match &original_actor.object_items.url {
                     None => None,
-                    Some(item) => Some(item.href.to_string())
+                    Some(item) => Some(item.href.to_string()),
                 },
                 moved_to: original_actor
                     .activity_streams_ext_items
@@ -274,7 +263,7 @@ async fn save_profile_resource<'a>(
                 published: match &original_actor.object_items.published {
                     None => None,
                     Some(item) => Some(item.to_rfc3339()),
-                }
+                },
             })?,
         )
         .await
@@ -285,6 +274,7 @@ async fn save_actor_resource(
     account: &Account,
     original_actor: ap_model::Object,
     predef_urls: &PredefUrls,
+    outbox_url_opt: Option<Url>,
 ) -> Result<(), Box<dyn Error>> {
     let original_actor_items = match original_actor.actor_items {
         None => panic!("unreachable: actor_items should be available."),
@@ -328,7 +318,10 @@ async fn save_actor_resource(
         },
         actor_items: Some(ap_model::ActorItems {
             inbox: predef_urls.inbox_url.to_string(),
-            outbox: predef_urls.empty_ordered_collection_url.to_string(),
+            outbox: match outbox_url_opt {
+                None => predef_urls.empty_ordered_collection_url.to_string(),
+                Some(outbox_url) => outbox_url.to_string(),
+            },
             following: predef_urls.empty_ordered_collection_url.to_string(),
             followers: predef_urls.empty_ordered_collection_url.to_string(),
             preferred_username: original_actor_items.preferred_username,
@@ -404,12 +397,14 @@ impl NewOutboxCollectionManager {
         }
 
         if self.items.len() < self.page_items_count {
-            return Ok(())
+            return Ok(());
         }
 
         let save_page_path = match &self.head_object_base_path_opt {
             Some(object_base_path) => format!("{}page.json", object_base_path),
-            None => panic!("unreachable: head object base path should be available if items are not empty."),
+            None => panic!(
+                "unreachable: head object base path should be available if items are not empty."
+            ),
         };
         let page_url = env.static_base_url.join(&save_page_path)?;
 
@@ -422,7 +417,8 @@ impl NewOutboxCollectionManager {
             &self.first_page_url_opt,
             &self.prev_page_url_opt,
             items,
-        ).await?;
+        )
+        .await?;
 
         self.head_object_base_path_opt = None;
         if self.first_page_url_opt.is_none() {
@@ -438,11 +434,13 @@ impl NewOutboxCollectionManager {
         env: &Env<'a>,
     ) -> Result<NewOutboxCollection, Box<dyn Error>> {
         let save_page_path = match self.head_object_base_path_opt {
-            None => return Ok(NewOutboxCollection {
-                total_items_count: self.total_items_count,
-                first_page_url_opt: self.first_page_url_opt,
-                last_page_url_opt: None,
-            }),
+            None => {
+                return Ok(NewOutboxCollection {
+                    total_items_count: self.total_items_count,
+                    first_page_url_opt: self.first_page_url_opt,
+                    last_page_url_opt: None,
+                })
+            }
             Some(head_object_base_path) => format!("{}page.json", head_object_base_path),
         };
         let last_page_url = env.static_base_url.join(&save_page_path)?;
@@ -453,7 +451,8 @@ impl NewOutboxCollectionManager {
             &self.first_page_url_opt,
             &self.prev_page_url_opt,
             self.items,
-        ).await?;
+        )
+        .await?;
 
         Ok(NewOutboxCollection {
             total_items_count: self.total_items_count,
@@ -467,56 +466,38 @@ async fn fetch_outbox_collection_ref<'a>(
     env: &Env<'a>,
     account: &Account,
     collection_ref: &ap_model::ObjectOrLink,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Url, Box<dyn Error>> {
     match collection_ref {
         ap_model::ObjectOrLink::Link(collection_ref) => {
-            let collection = activitypub::fetch_object(&env.client, collection_ref.href.to_string()).await?;
-            fetch_outbox_collection(
-                env,
-                account,
-                &collection,
-            ).await?;
+            let collection =
+                activitypub::fetch_object(&env.client, collection_ref.href.to_string()).await?;
+            fetch_outbox_collection(env, account, &collection).await
         }
         ap_model::ObjectOrLink::Object(collection) => {
-            fetch_outbox_collection(
-                env,
-                account,
-                collection,
-            ).await?;
+            fetch_outbox_collection(env, account, collection).await
         }
     }
-    Ok(())
 }
 
 async fn fetch_outbox_collection<'a>(
     env: &Env<'a>,
     account: &Account,
     collection: &ap_model::Object,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Url, Box<dyn Error>> {
     let mut new_outbox_collection_manager = NewOutboxCollectionManager::new(env.page_items_count);
 
     for item in &collection.collection_items.items {
-        fetch_outbox_activity_ref(
-            env,
-            account,
-            item,
-            &mut new_outbox_collection_manager,
-        ).await?;
+        fetch_outbox_activity_ref(env, account, item, &mut new_outbox_collection_manager).await?;
     }
 
     for item in &collection.ordered_collection_items.ordered_items {
-        fetch_outbox_activity_ref(
-            env,
-            account,
-            item,
-            &mut new_outbox_collection_manager,
-        ).await?;
+        fetch_outbox_activity_ref(env, account, item, &mut new_outbox_collection_manager).await?;
     }
 
     if {
-        collection.collection_items.total_items != Some(0) &&
-        collection.collection_items.items.is_empty() &&
-        collection.ordered_collection_items.ordered_items.is_empty()
+        collection.collection_items.total_items != Some(0)
+            && collection.collection_items.items.is_empty()
+            && collection.ordered_collection_items.ordered_items.is_empty()
     } {
         match &collection.collection_items.first {
             None => {
@@ -525,25 +506,30 @@ async fn fetch_outbox_collection<'a>(
             Some(init_collection_page_ref) => {
                 fetch_outbox_collection_pages(
                     env,
-                    collection.collection_items.total_items.unwrap_or(env.default_max_pages),
+                    collection
+                        .collection_items
+                        .total_items
+                        .unwrap_or(env.default_max_pages),
                     account,
                     init_collection_page_ref,
                     &mut new_outbox_collection_manager,
-                ).await?;
+                )
+                .await?;
             }
         }
     }
 
     let new_outbox_collection = new_outbox_collection_manager.save_rest_items(env).await?;
-    save_outbox_collection(
+    let new_outbox_url = save_outbox_collection(
         env,
         &format!("{}outbox.json", account.base_path),
         new_outbox_collection.total_items_count,
         new_outbox_collection.first_page_url_opt,
         new_outbox_collection.last_page_url_opt,
-    ).await?;
+    )
+    .await?;
 
-    Ok(())
+    Ok(new_outbox_url)
 }
 
 async fn fetch_outbox_collection_pages<'a>(
@@ -559,7 +545,8 @@ async fn fetch_outbox_collection_pages<'a>(
         account,
         init_collection_page_ref,
         new_outbox_collection_manager,
-    ).await?;
+    )
+    .await?;
 
     let mut next_page_opt = result.next_page_opt;
     let mut max_pages_count = max_pages_count - result.fetched_pages_count;
@@ -570,7 +557,8 @@ async fn fetch_outbox_collection_pages<'a>(
             account,
             &ap_model::ObjectOrLink::Object(next_page),
             new_outbox_collection_manager,
-        ).await?;
+        )
+        .await?;
 
         next_page_opt = result.next_page_opt;
         max_pages_count -= result.fetched_pages_count;
@@ -607,25 +595,17 @@ async fn fetch_outbox_collection_pages_in_object_and_fetch_next<'a>(
                 return Ok(FetchNextCollectionPageResult {
                     next_page_opt: Some(next_page),
                     fetched_pages_count: fetched_pages_count + 1,
-                })
+                });
             }
             ap_model::ObjectOrLink::Object(collection_page) => {
                 for item in &collection_page.collection_items.items {
-                    fetch_outbox_activity_ref(
-                        env,
-                        account,
-                        item,
-                        new_outbox_collection_manager,
-                    ).await?;
+                    fetch_outbox_activity_ref(env, account, item, new_outbox_collection_manager)
+                        .await?;
                 }
 
                 for item in &collection_page.ordered_collection_items.ordered_items {
-                    fetch_outbox_activity_ref(
-                        env,
-                        account,
-                        item,
-                        new_outbox_collection_manager,
-                    ).await?;
+                    fetch_outbox_activity_ref(env, account, item, new_outbox_collection_manager)
+                        .await?;
                 }
 
                 match &collection_page.collection_page_items.next {
@@ -655,20 +635,10 @@ async fn fetch_outbox_activity_ref<'a>(
         ap_model::ObjectOrLink::Link(activity_ref) => {
             let uri = activity_ref.href.to_string();
             let activity = activitypub::fetch_object(&env.client, uri).await?;
-            fetch_outbox_activity(
-                env,
-                account,
-                &activity,
-                new_outbox_collection_manager,
-            ).await
+            fetch_outbox_activity(env, account, &activity, new_outbox_collection_manager).await
         }
         ap_model::ObjectOrLink::Object(activity) => {
-            fetch_outbox_activity(
-                env,
-                account,
-                activity,
-                new_outbox_collection_manager,
-            ).await
+            fetch_outbox_activity(env, account, activity, new_outbox_collection_manager).await
         }
     }
 }
@@ -688,7 +658,7 @@ async fn fetch_outbox_activity<'a>(
                 }
                 _ => {
                     accepted_type = true;
-                    break
+                    break;
                 }
             }
         }
@@ -698,11 +668,7 @@ async fn fetch_outbox_activity<'a>(
     }
 
     for object_ref in &activity.activity_items.object {
-        let new_object = fetch_outbox_object_ref(
-            env,
-            account,
-            object_ref,
-        ).await?;
+        let new_object = fetch_outbox_object_ref(env, account, object_ref).await?;
 
         let save_activity_path = format!("{}activity.json", &new_object.base_path);
         let new_activity = save_outbox_activity(
@@ -711,13 +677,12 @@ async fn fetch_outbox_activity<'a>(
             &save_activity_path,
             activity,
             &new_object.object,
-        ).await?;
+        )
+        .await?;
 
-        new_outbox_collection_manager.add_activity_and_save_if_needed(
-            env,
-            new_object.base_path,
-            new_activity,
-        ).await?;
+        new_outbox_collection_manager
+            .add_activity_and_save_if_needed(env, new_object.base_path, new_activity)
+            .await?;
     }
 
     Ok(())
@@ -732,25 +697,15 @@ async fn fetch_outbox_object_ref<'a>(
         ap_model::ObjectOrLink::Link(object_ref) => {
             let uri = object_ref.href.to_string();
             let object = activitypub::fetch_object(&env.client, uri).await?;
-            save_outbox_object(
-                env,
-                account,
-                &object,
-            ).await
+            save_outbox_object(env, account, &object).await
         }
-        ap_model::ObjectOrLink::Object(object) => {
-            save_outbox_object(
-                env,
-                account,
-                object,
-            ).await
-        }
+        ap_model::ObjectOrLink::Object(object) => save_outbox_object(env, account, object).await,
     }
 }
 
 struct NewObject {
     base_path: String,
-    object: ap_model::Object
+    object: ap_model::Object,
 }
 async fn save_outbox_object<'a>(
     env: &Env<'a>,
@@ -817,38 +772,39 @@ async fn save_outbox_object<'a>(
         mastodon_ext_items: object.mastodon_ext_items.clone(),
         security_items: object.security_items.clone(),
     };
-    env.output.save_static_json_resource(
-        &save_json_path,
-        &new_object.clone().from_model()?,
-    ).await?;
+    env.output
+        .save_static_json_resource(&save_json_path, &new_object.clone().from_model()?)
+        .await?;
 
     let save_html_path = format!("{}entities/{id}.html", account.base_path);
-    env.output.save_static_text_resource(
-        &save_html_path,
-        &env.templates.render_object_html(&ObjectHtmlParams {
-            typ: object.typ.first().cloned(),
-            account: account.ident.to_string(),
-            account_url: account.profile_url.to_string(),
-            object_url: new_object_url.to_string(),
-            to: match object.object_items.to.first() {
-                None => None,
-                Some(item) => match item {
-                    ap_model::ObjectOrLink::Link(item) => Some(item.href.to_string()),
-                    ap_model::ObjectOrLink::Object(item) => item.id.clone(),
-                }
-            },
-            content: object.object_items.content.first().cloned(),
-            content_map: object.object_items.content_map.clone(),
-            url: match &object.object_items.url {
-                None => None,
-                Some(item) => Some(item.href.to_string()),
-            },
-            published: match object.object_items.published {
-                None => None,
-                Some(item) => Some(item.to_rfc3339()),
-            },
-        })?,
-    ).await?;
+    env.output
+        .save_static_text_resource(
+            &save_html_path,
+            &env.templates.render_object_html(&ObjectHtmlParams {
+                typ: object.typ.first().cloned(),
+                account: account.ident.to_string(),
+                account_url: account.profile_url.to_string(),
+                object_url: new_object_url.to_string(),
+                to: match object.object_items.to.first() {
+                    None => None,
+                    Some(item) => match item {
+                        ap_model::ObjectOrLink::Link(item) => Some(item.href.to_string()),
+                        ap_model::ObjectOrLink::Object(item) => item.id.clone(),
+                    },
+                },
+                content: object.object_items.content.first().cloned(),
+                content_map: object.object_items.content_map.clone(),
+                url: match &object.object_items.url {
+                    None => None,
+                    Some(item) => Some(item.href.to_string()),
+                },
+                published: match object.object_items.published {
+                    None => None,
+                    Some(item) => Some(item.to_rfc3339()),
+                },
+            })?,
+        )
+        .await?;
 
     Ok(NewObject {
         base_path: format!("{}entities/{id}/", account.base_path),
@@ -901,13 +857,19 @@ async fn save_outbox_activity<'a>(
         },
         actor_items: original_activity.actor_items.clone(),
         activity_items: ap_model::ActivityItems {
-            actor: vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(account.actor_url.to_string()))],
+            actor: vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(
+                account.actor_url.to_string(),
+            ))],
             instrument: vec![],
             origin: match &original_activity.id {
                 None => vec![],
-                Some(item) => vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(item.to_string()))],
+                Some(item) => vec![ap_model::ObjectOrLink::Link(ap_model::Link::from(
+                    item.to_string(),
+                ))],
             },
-            object: vec![ap_model::ObjectOrLink::Object(new_object.clone_without_schema_context())],
+            object: vec![ap_model::ObjectOrLink::Object(
+                new_object.clone_without_schema_context(),
+            )],
             result: vec![],
             target: vec![],
         },
@@ -924,10 +886,9 @@ async fn save_outbox_activity<'a>(
         security_items: original_activity.security_items.clone(),
     };
 
-    env.output.save_static_json_resource(
-        new_activity_path,
-        &new_activity.clone().from_model()?,
-    ).await?;
+    env.output
+        .save_static_json_resource(new_activity_path, &new_activity.clone().from_model()?)
+        .await?;
 
     Ok(new_activity)
 }
@@ -941,52 +902,55 @@ async fn save_outbox_collection_page<'a>(
 ) -> Result<(), Box<dyn Error>> {
     let page_url = env.static_base_url.join(&save_page_path)?;
 
-    env.output.save_static_json_resource(
-        &save_page_path,
-        &ap_model::Object {
-            schema_context: Some(ap_model::Context::object_default()),
-            id: Some(page_url.to_string()),
-            typ: vec!["OrderedCollectionPage".to_string()],
-            object_items: ap_model::ObjectItems::empty(),
-            actor_items: None,
-            activity_items: ap_model::ActivityItems::empty(),
-            collection_items: ap_model::CollectionItems {
-                total_items: None,
-                current: None,
-                first: match &first_page_url_opt {
-                    None => None,
-                    Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
-                        ap_model::Link::from(first_page_url.as_str()),
-                    ))),
+    env.output
+        .save_static_json_resource(
+            &save_page_path,
+            &ap_model::Object {
+                schema_context: Some(ap_model::Context::object_default()),
+                id: Some(page_url.to_string()),
+                typ: vec!["OrderedCollectionPage".to_string()],
+                object_items: ap_model::ObjectItems::empty(),
+                actor_items: None,
+                activity_items: ap_model::ActivityItems::empty(),
+                collection_items: ap_model::CollectionItems {
+                    total_items: None,
+                    current: None,
+                    first: match &first_page_url_opt {
+                        None => None,
+                        Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                            ap_model::Link::from(first_page_url.as_str()),
+                        ))),
+                    },
+                    last: None,
+                    items: vec![],
                 },
-                last: None,
-                items: vec![],
-            },
-            ordered_collection_items: ap_model::OrderedCollectionItems {
-                ordered_items: items,
-            },
-            collection_page_items: ap_model::CollectionPageItems {
-                next: None,
-                prev: match &prev_page_url_opt {
-                    None => None,
-                    Some(prev_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
-                        ap_model::Link::from(prev_page_url.as_str()),
-                    ))),
+                ordered_collection_items: ap_model::OrderedCollectionItems {
+                    ordered_items: items,
                 },
-                part_of: None,
-            },
-            ordered_collection_page_items: ap_model::OrderedCollectionPageItems {
-                start_index: None,
-            },
-            relationship_items: ap_model::RelationshipItems::empty(),
-            tombstone_items: ap_model::TombstoneItems::empty(),
-            question_items: ap_model::QuestionItems::empty(),
-            place_items: ap_model::PlaceItems::empty(),
-            activity_streams_ext_items: ap_model::ActivityStreamExtItems::empty(),
-            mastodon_ext_items: ap_model::MastodonExtItems::empty(),
-            security_items: ap_model::SecurityItems::empty(),
-        }.from_model()?,
-    ).await?;
+                collection_page_items: ap_model::CollectionPageItems {
+                    next: None,
+                    prev: match &prev_page_url_opt {
+                        None => None,
+                        Some(prev_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                            ap_model::Link::from(prev_page_url.as_str()),
+                        ))),
+                    },
+                    part_of: None,
+                },
+                ordered_collection_page_items: ap_model::OrderedCollectionPageItems {
+                    start_index: None,
+                },
+                relationship_items: ap_model::RelationshipItems::empty(),
+                tombstone_items: ap_model::TombstoneItems::empty(),
+                question_items: ap_model::QuestionItems::empty(),
+                place_items: ap_model::PlaceItems::empty(),
+                activity_streams_ext_items: ap_model::ActivityStreamExtItems::empty(),
+                mastodon_ext_items: ap_model::MastodonExtItems::empty(),
+                security_items: ap_model::SecurityItems::empty(),
+            }
+            .from_model()?,
+        )
+        .await?;
 
     Ok(())
 }
@@ -997,30 +961,35 @@ async fn save_outbox_collection<'a>(
     total_items_count: usize,
     first_page_url_opt: Option<Url>,
     last_page_url_opt: Option<Url>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Url, Box<dyn Error>> {
     let url = env.static_base_url.join(save_path)?;
 
-    env.output.save_static_json_resource(
-        save_path,
-        &ap_model::Object::new_collection(
-            Some(url.to_string()),
-            vec!["OrderedCollection".to_string()],
-            Some(total_items_count),
-            None,
-            match first_page_url_opt {
-                None => None,
-                Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
-                    ap_model::Link::from(first_page_url.to_string()),
-                ))),
-            },
-            match last_page_url_opt {
-                None => None,
-                Some(last_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
-                    ap_model::Link::from(last_page_url.to_string()),
-                ))),
-            },
-            vec![],
-            vec![],
-        ).from_model()?,
-    ).await
+    env.output
+        .save_static_json_resource(
+            save_path,
+            &ap_model::Object::new_collection(
+                Some(url.to_string()),
+                vec!["OrderedCollection".to_string()],
+                Some(total_items_count),
+                None,
+                match first_page_url_opt {
+                    None => None,
+                    Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                        ap_model::Link::from(first_page_url.to_string()),
+                    ))),
+                },
+                match last_page_url_opt {
+                    None => None,
+                    Some(last_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                        ap_model::Link::from(last_page_url.to_string()),
+                    ))),
+                },
+                vec![],
+                vec![],
+            )
+            .from_model()?,
+        )
+        .await?;
+
+    Ok(url)
 }
