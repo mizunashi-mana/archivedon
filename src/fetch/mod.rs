@@ -25,6 +25,7 @@ pub async fn run(
     output_path: &str,
     fetch_outbox: bool,
     default_max_pages: usize,
+    page_items_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     let input = input::load(input_path).await?;
     let output_path_buf = tokio::fs::canonicalize(output_path).await?;
@@ -36,6 +37,7 @@ pub async fn run(
         default_max_pages,
         static_base_url: Url::parse(&input.static_base_url)?,
         fetch_outbox,
+        page_items_count,
     };
 
     let predef_urls = save_predefs(&env).await?;
@@ -357,6 +359,93 @@ async fn save_actor_resource(
         .await
 }
 
+struct NewOutboxCollectionManager {
+    // immutable
+    page_items_count: usize,
+
+    // mutable
+    first_page_url_opt: Option<Url>,
+    prev_page_url_opt: Option<Url>,
+    head_object_base_path_opt: Option<String>,
+    items: Vec<ap_model::ObjectOrLink>,
+}
+
+impl NewOutboxCollectionManager {
+    fn new(page_items_count: usize) -> Self {
+        assert!(page_items_count > 0);
+
+        Self {
+            page_items_count,
+            first_page_url_opt: None,
+            prev_page_url_opt: None,
+            head_object_base_path_opt: None,
+            items: vec![],
+        }
+    }
+
+    async fn add_activity_and_save_if_needed<'a>(
+        &mut self,
+        env: &Env<'a>,
+        object_base_path: String,
+        item: ap_model::Object,
+    ) -> Result<(), Box<dyn Error>> {
+        self.items.push(ap_model::ObjectOrLink::Object(item));
+        if self.head_object_base_path_opt.is_none() {
+            self.head_object_base_path_opt = Some(object_base_path);
+        }
+
+        if self.items.len() < self.page_items_count {
+            return Ok(())
+        }
+
+        let save_page_path = match &self.head_object_base_path_opt {
+            Some(object_base_path) => format!("{}page.json", object_base_path),
+            None => panic!("unreachable: head object base path should be available if items are not empty."),
+        };
+        let page_url = env.static_base_url.join(&save_page_path)?;
+
+        let mut items = vec![];
+        items.append(&mut self.items);
+
+        save_outbox_collection_page(
+            env,
+            &save_page_path,
+            &self.first_page_url_opt,
+            &self.prev_page_url_opt,
+            items,
+        ).await?;
+
+        self.head_object_base_path_opt = None;
+        if self.first_page_url_opt.is_none() {
+            self.first_page_url_opt = Some(page_url.clone());
+        }
+        self.prev_page_url_opt = Some(page_url);
+
+        Ok(())
+    }
+
+    async fn save_rest_items<'a>(
+        self,
+        env: &Env<'a>,
+    ) -> Result<Option<Url>, Box<dyn Error>> {
+        let save_page_path = match self.head_object_base_path_opt {
+            None => return Ok(None),
+            Some(head_object_base_path) => format!("{}page.json", head_object_base_path),
+        };
+        let page_url = env.static_base_url.join(&save_page_path)?;
+
+        save_outbox_collection_page(
+            env,
+            &save_page_path,
+            &self.first_page_url_opt,
+            &self.prev_page_url_opt,
+            self.items,
+        ).await?;
+
+        Ok(Some(page_url))
+    }
+}
+
 async fn fetch_outbox_collection_ref<'a>(
     env: &Env<'a>,
     account: &Account,
@@ -369,16 +458,17 @@ async fn fetch_outbox_collection_ref<'a>(
                 env,
                 account,
                 &collection,
-            ).await
+            ).await?;
         }
         ap_model::ObjectOrLink::Object(collection) => {
             fetch_outbox_collection(
                 env,
                 account,
                 collection,
-            ).await
+            ).await?;
         }
     }
+    Ok(())
 }
 
 async fn fetch_outbox_collection<'a>(
@@ -386,11 +476,14 @@ async fn fetch_outbox_collection<'a>(
     account: &Account,
     collection: &ap_model::Object,
 ) -> Result<(), Box<dyn Error>> {
+    let mut new_outbox_collection_manager = NewOutboxCollectionManager::new(env.page_items_count);
+
     for item in &collection.collection_items.items {
         fetch_outbox_activity_ref(
             env,
             account,
             item,
+            &mut new_outbox_collection_manager,
         ).await?;
     }
 
@@ -399,26 +492,34 @@ async fn fetch_outbox_collection<'a>(
             env,
             account,
             item,
+            &mut new_outbox_collection_manager,
         ).await?;
     }
 
     if {
-        !collection.collection_items.items.is_empty() ||
-        !collection.ordered_collection_items.ordered_items.is_empty() ||
-        collection.collection_items.total_items == Some(0)
+        collection.collection_items.total_items != Some(0) &&
+        collection.collection_items.items.is_empty() &&
+        collection.ordered_collection_items.ordered_items.is_empty()
     } {
-        return Ok(())
+        match &collection.collection_items.first {
+            None => {
+                // do nothing
+            }
+            Some(init_collection_page_ref) => {
+                fetch_outbox_collection_pages(
+                    env,
+                    collection.collection_items.total_items.unwrap_or(env.default_max_pages),
+                    account,
+                    init_collection_page_ref,
+                    &mut new_outbox_collection_manager,
+                ).await?;
+            }
+        }
     }
 
-    match &collection.collection_items.first {
-        None => Ok(()),
-        Some(init_collection_page_ref) => fetch_outbox_collection_pages(
-            env,
-            collection.collection_items.total_items.unwrap_or(env.default_max_pages),
-            account,
-            init_collection_page_ref,
-        ).await
-    }
+    new_outbox_collection_manager.save_rest_items(env).await?;
+
+    Ok(())
 }
 
 async fn fetch_outbox_collection_pages<'a>(
@@ -426,12 +527,14 @@ async fn fetch_outbox_collection_pages<'a>(
     max_pages_count: usize,
     account: &Account,
     init_collection_page_ref: &ap_model::ObjectOrLink,
+    new_outbox_collection_manager: &mut NewOutboxCollectionManager,
 ) -> Result<(), Box<dyn Error>> {
     let result = fetch_outbox_collection_pages_in_object_and_fetch_next(
         env,
         max_pages_count,
         account,
         init_collection_page_ref,
+        new_outbox_collection_manager,
     ).await?;
 
     let mut next_page_opt = result.next_page_opt;
@@ -442,6 +545,7 @@ async fn fetch_outbox_collection_pages<'a>(
             max_pages_count,
             account,
             &ap_model::ObjectOrLink::Object(next_page),
+            new_outbox_collection_manager,
         ).await?;
 
         next_page_opt = result.next_page_opt;
@@ -460,6 +564,7 @@ async fn fetch_outbox_collection_pages_in_object_and_fetch_next<'a>(
     max_pages_count: usize,
     account: &Account,
     collection_page_ref: &ap_model::ObjectOrLink,
+    new_outbox_collection_manager: &mut NewOutboxCollectionManager,
 ) -> Result<FetchNextCollectionPageResult, Box<dyn Error>> {
     let mut collection_page_ref = collection_page_ref;
     let mut fetched_pages_count: usize = 0;
@@ -486,6 +591,7 @@ async fn fetch_outbox_collection_pages_in_object_and_fetch_next<'a>(
                         env,
                         account,
                         item,
+                        new_outbox_collection_manager,
                     ).await?;
                 }
 
@@ -494,6 +600,7 @@ async fn fetch_outbox_collection_pages_in_object_and_fetch_next<'a>(
                         env,
                         account,
                         item,
+                        new_outbox_collection_manager,
                     ).await?;
                 }
 
@@ -518,7 +625,8 @@ async fn fetch_outbox_activity_ref<'a>(
     env: &Env<'a>,
     account: &Account,
     activity_ref: &ap_model::ObjectOrLink,
-) -> Result<Vec<ap_model::Object>, Box<dyn Error>> {
+    new_outbox_collection_manager: &mut NewOutboxCollectionManager,
+) -> Result<(), Box<dyn Error>> {
     match activity_ref {
         ap_model::ObjectOrLink::Link(activity_ref) => {
             let uri = activity_ref.href.to_string();
@@ -527,6 +635,7 @@ async fn fetch_outbox_activity_ref<'a>(
                 env,
                 account,
                 &activity,
+                new_outbox_collection_manager,
             ).await
         }
         ap_model::ObjectOrLink::Object(activity) => {
@@ -534,6 +643,7 @@ async fn fetch_outbox_activity_ref<'a>(
                 env,
                 account,
                 activity,
+                new_outbox_collection_manager,
             ).await
         }
     }
@@ -543,9 +653,8 @@ async fn fetch_outbox_activity<'a>(
     env: &Env<'a>,
     account: &Account,
     activity: &ap_model::Object,
-) -> Result<Vec<ap_model::Object>, Box<dyn Error>> {
-    let mut new_activities = vec![];
-
+    new_outbox_collection_manager: &mut NewOutboxCollectionManager,
+) -> Result<(), Box<dyn Error>> {
     {
         let mut accepted_type = false;
         for typ in &activity.typ {
@@ -560,7 +669,7 @@ async fn fetch_outbox_activity<'a>(
             }
         }
         if !accepted_type {
-            return Ok(new_activities);
+            return Ok(());
         }
     }
 
@@ -580,10 +689,14 @@ async fn fetch_outbox_activity<'a>(
             &new_object.object,
         ).await?;
 
-        new_activities.push(new_activity);
+        new_outbox_collection_manager.add_activity_and_save_if_needed(
+            env,
+            new_object.base_path,
+            new_activity,
+        ).await?;
     }
 
-    Ok(new_activities)
+    Ok(())
 }
 
 async fn fetch_outbox_object_ref<'a>(
@@ -793,4 +906,63 @@ async fn save_outbox_activity<'a>(
     ).await?;
 
     Ok(new_activity)
+}
+
+async fn save_outbox_collection_page<'a>(
+    env: &Env<'a>,
+    save_page_path: &str,
+    first_page_url_opt: &Option<Url>,
+    prev_page_url_opt: &Option<Url>,
+    items: Vec<ap_model::ObjectOrLink>,
+) -> Result<(), Box<dyn Error>> {
+    let page_url = env.static_base_url.join(&save_page_path)?;
+
+    env.output.save_static_json_resource(
+        &save_page_path,
+        &ap_model::Object {
+            schema_context: Some(ap_model::Context::object_default()),
+            id: Some(page_url.to_string()),
+            typ: vec!["OrderedCollectionPage".to_string()],
+            object_items: ap_model::ObjectItems::empty(),
+            actor_items: None,
+            activity_items: ap_model::ActivityItems::empty(),
+            collection_items: ap_model::CollectionItems {
+                total_items: None,
+                current: None,
+                first: match &first_page_url_opt {
+                    None => None,
+                    Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                        ap_model::Link::from(first_page_url.as_str()),
+                    ))),
+                },
+                last: None,
+                items: vec![],
+            },
+            ordered_collection_items: ap_model::OrderedCollectionItems {
+                ordered_items: items,
+            },
+            collection_page_items: ap_model::CollectionPageItems {
+                next: None,
+                prev: match &prev_page_url_opt {
+                    None => None,
+                    Some(prev_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                        ap_model::Link::from(prev_page_url.as_str()),
+                    ))),
+                },
+                part_of: None,
+            },
+            ordered_collection_page_items: ap_model::OrderedCollectionPageItems {
+                start_index: None,
+            },
+            relationship_items: ap_model::RelationshipItems::empty(),
+            tombstone_items: ap_model::TombstoneItems::empty(),
+            question_items: ap_model::QuestionItems::empty(),
+            place_items: ap_model::PlaceItems::empty(),
+            activity_streams_ext_items: ap_model::ActivityStreamExtItems::empty(),
+            mastodon_ext_items: ap_model::MastodonExtItems::empty(),
+            security_items: ap_model::SecurityItems::empty(),
+        }.from_model()?,
+    ).await?;
+
+    Ok(())
 }

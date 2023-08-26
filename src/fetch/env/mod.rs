@@ -10,4 +10,5 @@ pub struct Env<'a> {
     pub default_max_pages: usize,
     pub static_base_url: Url,
     pub fetch_outbox: bool,
+    pub page_items_count: usize,
 }

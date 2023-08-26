@@ -17,13 +17,21 @@ struct Cli {
     fetch_outbox: bool,
     #[arg(long, default_value_t = 1000)]
     default_max_pages: usize,
+    #[arg(long, default_value_t = 5)]
+    page_items_count: usize,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
-    fetch::run(&cli.input, &cli.output, cli.fetch_outbox, cli.default_max_pages).await?;
+    fetch::run(
+        &cli.input,
+        &cli.output,
+        cli.fetch_outbox,
+        cli.default_max_pages,
+        cli.page_items_count,
+    ).await?;
 
     Ok(())
 }
