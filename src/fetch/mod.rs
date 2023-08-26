@@ -367,7 +367,14 @@ struct NewOutboxCollectionManager {
     first_page_url_opt: Option<Url>,
     prev_page_url_opt: Option<Url>,
     head_object_base_path_opt: Option<String>,
+    total_items_count: usize,
     items: Vec<ap_model::ObjectOrLink>,
+}
+
+struct NewOutboxCollection {
+    total_items_count: usize,
+    first_page_url_opt: Option<Url>,
+    last_page_url_opt: Option<Url>,
 }
 
 impl NewOutboxCollectionManager {
@@ -379,6 +386,7 @@ impl NewOutboxCollectionManager {
             first_page_url_opt: None,
             prev_page_url_opt: None,
             head_object_base_path_opt: None,
+            total_items_count: 0,
             items: vec![],
         }
     }
@@ -390,6 +398,7 @@ impl NewOutboxCollectionManager {
         item: ap_model::Object,
     ) -> Result<(), Box<dyn Error>> {
         self.items.push(ap_model::ObjectOrLink::Object(item));
+        self.total_items_count += 1;
         if self.head_object_base_path_opt.is_none() {
             self.head_object_base_path_opt = Some(object_base_path);
         }
@@ -427,12 +436,16 @@ impl NewOutboxCollectionManager {
     async fn save_rest_items<'a>(
         self,
         env: &Env<'a>,
-    ) -> Result<Option<Url>, Box<dyn Error>> {
+    ) -> Result<NewOutboxCollection, Box<dyn Error>> {
         let save_page_path = match self.head_object_base_path_opt {
-            None => return Ok(None),
+            None => return Ok(NewOutboxCollection {
+                total_items_count: self.total_items_count,
+                first_page_url_opt: self.first_page_url_opt,
+                last_page_url_opt: None,
+            }),
             Some(head_object_base_path) => format!("{}page.json", head_object_base_path),
         };
-        let page_url = env.static_base_url.join(&save_page_path)?;
+        let last_page_url = env.static_base_url.join(&save_page_path)?;
 
         save_outbox_collection_page(
             env,
@@ -442,7 +455,11 @@ impl NewOutboxCollectionManager {
             self.items,
         ).await?;
 
-        Ok(Some(page_url))
+        Ok(NewOutboxCollection {
+            total_items_count: self.total_items_count,
+            first_page_url_opt: self.first_page_url_opt,
+            last_page_url_opt: Some(last_page_url),
+        })
     }
 }
 
@@ -517,7 +534,14 @@ async fn fetch_outbox_collection<'a>(
         }
     }
 
-    new_outbox_collection_manager.save_rest_items(env).await?;
+    let new_outbox_collection = new_outbox_collection_manager.save_rest_items(env).await?;
+    save_outbox_collection(
+        env,
+        &format!("{}outbox.json", account.base_path),
+        new_outbox_collection.total_items_count,
+        new_outbox_collection.first_page_url_opt,
+        new_outbox_collection.last_page_url_opt,
+    ).await?;
 
     Ok(())
 }
@@ -965,4 +989,38 @@ async fn save_outbox_collection_page<'a>(
     ).await?;
 
     Ok(())
+}
+
+async fn save_outbox_collection<'a>(
+    env: &Env<'a>,
+    save_path: &str,
+    total_items_count: usize,
+    first_page_url_opt: Option<Url>,
+    last_page_url_opt: Option<Url>,
+) -> Result<(), Box<dyn Error>> {
+    let url = env.static_base_url.join(save_path)?;
+
+    env.output.save_static_json_resource(
+        save_path,
+        &ap_model::Object::new_collection(
+            Some(url.to_string()),
+            vec!["OrderedCollection".to_string()],
+            Some(total_items_count),
+            None,
+            match first_page_url_opt {
+                None => None,
+                Some(first_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                    ap_model::Link::from(first_page_url.to_string()),
+                ))),
+            },
+            match last_page_url_opt {
+                None => None,
+                Some(last_page_url) => Some(Box::new(ap_model::ObjectOrLink::Link(
+                    ap_model::Link::from(last_page_url.to_string()),
+                ))),
+            },
+            vec![],
+            vec![],
+        ).from_model()?,
+    ).await
 }
