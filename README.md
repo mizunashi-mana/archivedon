@@ -1,10 +1,14 @@
 # Archived AP server
 
-An implementation of archived AP server.
+An implementation of archived ActivityPub server.
 
 * Serving static archived resources.
 * Redirecting old resource URLs if archived resources are available.
 * Return 410 Gone in other.
+
+## How to install
+
+Download from https://github.com/mizunashi-mana/archivedon/releases.
 
 ## Fetch migration data
 
