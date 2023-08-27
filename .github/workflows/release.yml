@@ -1,0 +1,40 @@
+name: Release
+
+on:
+    push:
+        branches: [ "main" ]
+        tags: [ "*" ]
+    pull_request:
+        branches: [ "main" ]
+
+jobs:
+    test:
+        # To use old glibc to link
+        runs-on: ubuntu-20.04
+
+        strategy:
+            matrix:
+                target:
+                    - "x86_64-unknown-linux-gnu"
+
+        steps:
+            -   uses: actions/checkout@v3
+
+            -   name: Install rust
+                uses: dtolnay/rust-toolchain@stable
+
+            -   name: Build
+                run: cargo build --release --verbose --target=${{ matrix.target }}
+
+            -   name: Build
+                run: |
+                    mkdir -p dest
+                    cp target/${{ matrix.target }}/release/archivedon-fetch dest/archivedon-fetch.${{ matrix.target }}
+                    cp target/${{ matrix.target }}/release/archivedon dest/archivedon.${{ matrix.target }}
+
+            -   name: Release
+                uses: softprops/action-gh-release@v1
+                if: startsWith(github.ref, 'refs/tags/')
+                with:
+                    files: |
+                        ./dest/*

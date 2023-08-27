@@ -758,7 +758,11 @@ async fn save_outbox_object<'a>(
         None => return Err(format!("Object ID should be available.").into()),
         Some(x) => RE_ID.captures(x),
     }) else {
-        return Err(format!("The format of object ID is not supported: id={:?}", &object.id).into())
+        return Err(format!(
+            "The format of object ID is not supported: id={:?}",
+            &object.id
+        )
+        .into());
     };
     let id = &caps["id"];
 
