@@ -1,11 +1,12 @@
+use archivedon::redirect_map::RedirectMap;
+use archivedon::resource_path::ResourcePath;
 use archivedon::webfinger::resource::Resource as WebfingerResource;
 use serde::Serialize;
 use std::{error::Error, path::PathBuf};
 use tokio::fs;
 
 pub struct Output {
-    static_dir: PathBuf,
-    webfinger_resource_dir: PathBuf,
+    resource_path: ResourcePath,
 }
 
 impl Output {
@@ -14,19 +15,8 @@ impl Output {
             fs::create_dir_all(&path).await?;
         }
 
-        let static_dir = path.join("static");
-        if !fs::try_exists(&static_dir).await? {
-            fs::create_dir(&static_dir).await?;
-        }
-
-        let webfinger_resource_dir = path.join("webfinger");
-        if !fs::try_exists(&webfinger_resource_dir).await? {
-            fs::create_dir(&webfinger_resource_dir).await?;
-        }
-
         Ok(Self {
-            static_dir,
-            webfinger_resource_dir,
+            resource_path: ResourcePath::new(path),
         })
     }
 
@@ -34,8 +24,7 @@ impl Output {
         &self,
         content: &WebfingerResource,
     ) -> Result<(), Box<dyn Error>> {
-        let filename = format!("{}.json", content.subject);
-        let save_path = self.webfinger_resource_dir.join(&filename);
+        let save_path = self.resource_path.webfinger_path(&content.subject);
         fs::write(&save_path, serde_json::to_vec(content)?).await?;
         Ok(())
     }
@@ -45,7 +34,7 @@ impl Output {
         path: &str,
         content: &T,
     ) -> Result<(), Box<dyn Error>> {
-        let save_path = self.static_dir.join(path);
+        let save_path = self.resource_path.static_root_dir.join(path);
         fs::create_dir_all(save_path.parent().unwrap()).await?;
         fs::write(&save_path, serde_json::to_vec(content)?).await?;
         Ok(())
@@ -56,9 +45,38 @@ impl Output {
         path: &str,
         content: &str,
     ) -> Result<(), Box<dyn Error>> {
-        let save_path = self.static_dir.join(path);
+        let save_path = self.resource_path.static_root_dir.join(path);
         fs::create_dir_all(save_path.parent().unwrap()).await?;
         fs::write(&save_path, content).await?;
+        Ok(())
+    }
+
+    pub async fn get_redirect_map_resource(
+        &self,
+        domain: &str,
+        url_path: &str,
+    ) -> Result<Option<RedirectMap>, Box<dyn Error>> {
+        let save_path = self.resource_path.redirect_map_path(domain, url_path);
+        if fs::try_exists(&save_path).await? {
+            let resource = fs::read(&save_path).await?;
+            match serde_json::from_slice(&resource) {
+                Ok(resource) => Ok(Some(resource)),
+                Err(_) => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn save_redirect_map_resource(
+        &self,
+        domain: &str,
+        url_path: &str,
+        resource: &RedirectMap,
+    ) -> Result<(), Box<dyn Error>> {
+        let save_path = self.resource_path.redirect_map_path(domain, url_path);
+        fs::create_dir_all(save_path.parent().unwrap()).await?;
+        fs::write(&save_path, serde_json::to_vec(resource)?).await?;
         Ok(())
     }
 }

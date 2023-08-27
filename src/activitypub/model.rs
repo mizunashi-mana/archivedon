@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use url::Url;
 
 /**
  * Schema: https://www.w3.org/TR/json-ld/#the-context
@@ -179,6 +180,21 @@ pub struct Link {
     pub media_type: Vec<String>,
     pub rel: Vec<String>,
     pub width: Option<usize>,
+}
+
+impl Link {
+    pub fn as_full_url(&self) -> Option<Url> {
+        match Url::parse(&self.href) {
+            Err(_) => None,
+            Ok(url) => {
+                if url.domain().is_none() {
+                    None
+                } else {
+                    Some(url)
+                }
+            }
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]

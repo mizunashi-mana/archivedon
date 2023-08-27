@@ -1,4 +1,5 @@
 use archivedon::webfinger;
+use log::error;
 use std::sync::Arc;
 
 use crate::server::env::Env;
@@ -9,8 +10,7 @@ pub async fn handle(
     params: Vec<(String, String)>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     let params = QueryParams::parse(params)?;
-
-    handle_account(env, &params.resource, params.rel).await
+    handle_resource(env, &params.resource, params.rel).await
 }
 
 #[derive(Debug)]
@@ -45,31 +45,49 @@ impl QueryParams {
     }
 }
 
-async fn handle_account(
+async fn handle_resource(
     env: Arc<Env>,
     resource: &str,
     rel: Vec<String>,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    let resource_path = env
-        .resource_dir
-        .join("webfinger")
-        .join(format!("{}.json", resource));
+    let resource_path = env.resource_path.webfinger_path(resource);
 
     match tokio::fs::try_exists(&resource_path).await {
         Ok(false) => return Ok(handler::not_found()),
+        Err(err) => {
+            error!(
+                "Failed to access resource path: path={}, err={}",
+                &resource_path.display(),
+                err
+            );
+            return Ok(handler::internal_server_error());
+        }
         Ok(true) => {
             // do nothing
         }
-        Err(_) => return Ok(handler::bad_request()),
     }
 
     let resource = match tokio::fs::read(&resource_path).await {
         Ok(x) => x,
-        Err(_) => return Ok(handler::bad_request()),
+        Err(err) => {
+            error!(
+                "Failed to access resource path: path={}, err={}",
+                &resource_path.display(),
+                err
+            );
+            return Ok(handler::internal_server_error());
+        }
     };
     let mut resource: webfinger::resource::Resource = match serde_json::from_slice(&resource) {
         Ok(x) => x,
-        Err(_) => return Ok(handler::bad_request()),
+        Err(err) => {
+            error!(
+                "Failed to deserialize resource: path={}, err={}",
+                &resource_path.display(),
+                err
+            );
+            return Ok(handler::bad_request());
+        }
     };
     if !rel.is_empty() {
         resource.links = match resource.links {

@@ -10,8 +10,10 @@ mod webfinger;
 
 use archivedon::activitypub::json::ModelConv;
 use archivedon::activitypub::model as ap_model;
+use archivedon::redirect_map::RedirectMap;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
 use chrono::Utc;
+use once_cell::sync::Lazy;
 use output::Output;
 use regex::Regex;
 use serde_json::json;
@@ -139,6 +141,8 @@ async fn fetch_account<'a>(
 
     save_profile_resource(&env.output, &account, &account_actor, &None, &env.templates).await?;
 
+    let original_account_link_opt = account_actor.object_items.url.clone();
+
     save_actor_resource(
         &env.output,
         &account,
@@ -147,6 +151,41 @@ async fn fetch_account<'a>(
         outbox_url_opt,
     )
     .await?;
+
+    if let Some(link) = original_account_link_opt {
+        if let Some(old_url) = link.as_full_url() {
+            let domain = match old_url.domain() {
+                None => panic!("unreachable: The domain of full URL should be available."),
+                Some(x) => x,
+            };
+            save_redirect_map(
+                env,
+                domain,
+                old_url.path(),
+                &["application/activity+json".to_string()],
+                &account.actor_url,
+            )
+            .await?;
+
+            let mut rest_media_type = vec!["*/*".to_string()];
+            for typ in link.media_type {
+                match typ.as_str() {
+                    "application/activity+json" => {
+                        // do nothing
+                    }
+                    _ => rest_media_type.push(typ),
+                }
+            }
+            save_redirect_map(
+                env,
+                domain,
+                old_url.path(),
+                &rest_media_type,
+                &account.profile_url,
+            )
+            .await?;
+        }
+    }
 
     Ok(())
 }
@@ -707,15 +746,17 @@ struct NewObject {
     base_path: String,
     object: ap_model::Object,
 }
+
+static RE_ID: Lazy<Regex> = Lazy::new(|| Regex::new(r".*/(?<id>\d+)$").unwrap());
+
 async fn save_outbox_object<'a>(
     env: &Env<'a>,
     account: &Account,
     object: &ap_model::Object,
 ) -> Result<NewObject, Box<dyn Error>> {
-    let id_re = Regex::new(r".*/(?<id>\d+)$").unwrap();
     let Some(caps) = (match &object.id {
         None => return Err(format!("Object ID should be available.").into()),
-        Some(x) => id_re.captures(x),
+        Some(x) => RE_ID.captures(x),
     }) else {
         return Err(format!("The format of object ID is not supported: id={:?}", &object.id).into())
     };
@@ -805,6 +846,23 @@ async fn save_outbox_object<'a>(
             })?,
         )
         .await?;
+
+    if let Some(link) = &object.object_items.url {
+        if let Some(old_url) = &link.as_full_url() {
+            let domain = match old_url.domain() {
+                None => panic!("unreachable: The domain of full URL should be available."),
+                Some(x) => x,
+            };
+            save_redirect_map(
+                env,
+                domain,
+                old_url.path(),
+                &link.media_type,
+                &new_object_url,
+            )
+            .await?;
+        }
+    }
 
     Ok(NewObject {
         base_path: format!("{}entities/{id}/", account.base_path),
@@ -992,4 +1050,65 @@ async fn save_outbox_collection<'a>(
         .await?;
 
     Ok(url)
+}
+
+async fn save_redirect_map<'a>(
+    env: &Env<'a>,
+    domain: &str,
+    url_path: &str,
+    media_type: &[String],
+    new_url: &Url,
+) -> Result<(), Box<dyn Error>> {
+    match env
+        .output
+        .get_redirect_map_resource(domain, url_path)
+        .await?
+    {
+        None => {
+            let redirect_map = RedirectMap::new();
+            save_redirect_map_with_old_resource(
+                env,
+                domain,
+                url_path,
+                redirect_map,
+                media_type,
+                new_url,
+            )
+            .await
+        }
+        Some(redirect_map) => {
+            save_redirect_map_with_old_resource(
+                env,
+                domain,
+                url_path,
+                redirect_map,
+                media_type,
+                new_url,
+            )
+            .await
+        }
+    }
+}
+
+async fn save_redirect_map_with_old_resource<'a>(
+    env: &Env<'a>,
+    domain: &str,
+    url_path: &str,
+    mut redirect_map: RedirectMap,
+    media_type: &[String],
+    new_url: &Url,
+) -> Result<(), Box<dyn Error>> {
+    if media_type.is_empty() {
+        redirect_map.insert_entry("*/*".to_string(), new_url);
+    }
+
+    for typ in media_type {
+        redirect_map.insert_entry(typ.to_string(), new_url);
+    }
+
+    env.output
+        .save_redirect_map_resource(domain, url_path, &redirect_map)
+        .await?;
+
+    Ok(())
 }

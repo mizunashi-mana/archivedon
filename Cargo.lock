@@ -94,9 +94,12 @@ dependencies = [
 name = "archivedon"
 version = "0.1.0"
 dependencies = [
+ "base64 0.21.2",
  "chrono",
  "clap",
  "handlebars",
+ "log",
+ "once_cell",
  "regex",
  "reqwest",
  "serde",
