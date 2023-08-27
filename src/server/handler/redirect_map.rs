@@ -53,6 +53,7 @@ pub async fn handle(
     };
 
     let mut redirect_url_opt = None;
+    // TODO: full support accept header syntax
     if let Some(accept) = accept {
         if let Some(url) = resource.get_entry(&accept) {
             redirect_url_opt = Some(url)
@@ -61,12 +62,6 @@ pub async fn handle(
 
     if redirect_url_opt.is_none() {
         if let Some(url) = resource.get_entry("*/*") {
-            redirect_url_opt = Some(url)
-        }
-    }
-
-    if redirect_url_opt.is_none() {
-        if let Some(url) = resource.get_entry("text/html") {
             redirect_url_opt = Some(url)
         }
     }

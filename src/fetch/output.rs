@@ -2,7 +2,7 @@ use archivedon::redirect_map::RedirectMap;
 use archivedon::resource_path::ResourcePath;
 use archivedon::webfinger::resource::Resource as WebfingerResource;
 use serde::Serialize;
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, path::Path};
 use tokio::fs;
 
 pub struct Output {
@@ -10,13 +10,10 @@ pub struct Output {
 }
 
 impl Output {
-    pub async fn create(path: PathBuf) -> Result<Self, Box<dyn Error>> {
-        if !fs::try_exists(&path).await? {
-            fs::create_dir_all(&path).await?;
-        }
-
+    pub async fn load(path: &Path) -> Result<Self, Box<dyn Error>> {
+        fs::create_dir_all(&path).await?;
         Ok(Self {
-            resource_path: ResourcePath::new(path),
+            resource_path: ResourcePath::new(fs::canonicalize(path).await?),
         })
     }
 
@@ -25,6 +22,7 @@ impl Output {
         content: &WebfingerResource,
     ) -> Result<(), Box<dyn Error>> {
         let save_path = self.resource_path.webfinger_path(&content.subject);
+        fs::create_dir_all(save_path.parent().unwrap()).await?;
         fs::write(&save_path, serde_json::to_vec(content)?).await?;
         Ok(())
     }

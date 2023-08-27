@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
 
 mod activitypub;
 mod env;
@@ -30,11 +31,10 @@ pub async fn run(
     page_items_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     let input = input::load(input_path).await?;
-    let output_path_buf = tokio::fs::canonicalize(output_path).await?;
 
     let env = Env {
         client: reqwest::Client::new(),
-        output: Output::create(output_path_buf).await?,
+        output: Output::load(Path::new(output_path)).await?,
         templates: Templates::create()?,
         default_max_pages,
         static_base_url: Url::parse(&input.static_base_url)?,
