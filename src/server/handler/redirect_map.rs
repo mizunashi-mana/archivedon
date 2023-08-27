@@ -67,7 +67,7 @@ pub async fn handle(
     }
 
     let redirect_url = match redirect_url_opt {
-        None => return Ok(handler::not_found()),
+        None => return Err(warp::reject()),
         Some(x) => x,
     };
 

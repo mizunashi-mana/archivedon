@@ -5,6 +5,7 @@ use std::{
 };
 use warp::Filter;
 
+use crate::server::handler;
 use crate::server::handler::webfinger;
 use crate::server::{env::Env, handler::redirect_map};
 
@@ -39,7 +40,15 @@ pub async fn run(
         .and(warp::header::optional("accept"))
         .and_then(redirect_map::handle);
 
-    let service = webfinger.or(static_resource).or(redirect_map);
+    let gone_get = warp::get().map(|| handler::gone());
+
+    let gone_post = warp::post().map(|| handler::gone());
+
+    let service = webfinger
+        .or(static_resource)
+        .or(redirect_map)
+        .or(gone_get)
+        .or(gone_post);
 
     let (_, server) = warp::serve(service).try_bind_ephemeral(sock_addr)?;
     server.await;

@@ -21,3 +21,10 @@ pub fn internal_server_error() -> Box<dyn warp::Reply> {
         warp::http::StatusCode::INTERNAL_SERVER_ERROR,
     ))
 }
+
+pub fn gone() -> Box<dyn warp::Reply> {
+    Box::new(warp::reply::with_status(
+        "Gone",
+        warp::http::StatusCode::GONE,
+    ))
+}
