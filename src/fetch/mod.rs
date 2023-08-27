@@ -143,7 +143,7 @@ async fn fetch_account<'a>(
         None
     };
 
-    save_profile_resource(&env.output, &account, &account_actor, &None, &env.templates).await?;
+    save_profile_resource(&env.output, &account, &account_actor, &env.templates).await?;
 
     let original_account_link_opt = account_actor.object_items.url.clone();
 
@@ -280,7 +280,6 @@ async fn save_profile_resource<'a>(
     output: &Output,
     account: &Account,
     original_actor: &ap_model::Object,
-    moved_profile_url: &Option<String>,
     templates: &Templates<'a>,
 ) -> Result<(), Box<dyn Error>> {
     output
@@ -302,7 +301,6 @@ async fn save_profile_resource<'a>(
                     .activity_streams_ext_items
                     .moved_to
                     .to_owned(),
-                moved_profile_url: moved_profile_url.to_owned(),
                 published: match &original_actor.object_items.published {
                     None => None,
                     Some(item) => Some(item.to_rfc3339()),

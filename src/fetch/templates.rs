@@ -17,7 +17,6 @@ pub struct ProfileHtmlParams {
     pub summary_map: HashMap<String, String>,
     pub url: Option<String>,
     pub moved_to: Option<String>,
-    pub moved_profile_url: Option<String>,
     pub published: Option<String>,
 }
 
@@ -55,11 +54,9 @@ impl<'a> Templates<'a> {
             "<body>",
             "<h1>Archived {{typ}}: {{account}}</h1>",
             "<dl>",
-            "{{#if moved_to}}{{#if moved_profile_url}}",
-            "<dt>Moved To</dt><dd><a href=\"{{moved_profile_url}}\">{{moved_to}}</a></dd>",
-            "{{else}}",
-            "<dt>Moved To</dt><dd>{{moved_to}}</dd>",
-            "{{/if}}{{/if}}",
+            "{{#if moved_to}}",
+            "<dt>Moved To</dt><dd><a href=\"{{moved_to}}\">{{moved_to}}</a></dd>",
+            "{{/if}}",
             "{{#if name}}<dt>Name</dt><dd>{{name}}</dd>{{/if}}",
             "{{#each name_map}}<dt>Name ({{@key}})</dt><dd>{{this}}</dd>{{/each}}",
             "{{#if summary}}<dt>Summary</dt><dd>{{{summary}}}</dd>{{/if}}",
