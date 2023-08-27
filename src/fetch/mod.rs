@@ -109,8 +109,12 @@ async fn fetch_account<'a>(
         .mastodon_ext_items
         .suspended
         .is_some_and(|x| x)
+        && account_actor.activity_streams_ext_items.moved_to.is_none()
     {
-        println!("Warning: account={} is not suspended.", account.ident);
+        println!(
+            "Warning: account={} is not suspended or moved.",
+            account.ident
+        );
     }
 
     save_webfinger_resource(
