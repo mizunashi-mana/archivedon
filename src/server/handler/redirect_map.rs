@@ -15,7 +15,7 @@ pub async fn handle(
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     let resource_path = env.resource_path.redirect_map_path(&host, path.as_str());
     match tokio::fs::try_exists(&resource_path).await {
-        Ok(false) => return Ok(handler::not_found()),
+        Ok(false) => return Err(warp::reject()),
         Err(err) => {
             error!(
                 "Failed to access resource path: path={}, err={}",
@@ -48,7 +48,7 @@ pub async fn handle(
                 &resource_path.display(),
                 err
             );
-            return Ok(handler::bad_request());
+            return Err(warp::reject());
         }
     };
 
@@ -73,7 +73,6 @@ pub async fn handle(
 
     let reply = warp::reply::reply();
     let reply = warp::reply::with_status(reply, warp::http::StatusCode::MOVED_PERMANENTLY);
-    let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
     let reply = warp::reply::with_header(reply, "Location", redirect_url.to_string());
 
     Ok(Box::new(reply))

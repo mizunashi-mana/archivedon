@@ -9,6 +9,9 @@ pub fn to_url_safe(base: &Path, domain: &str, url_path: &str, ext: &str) -> Path
     let mut path = base.join(component_to_url_safe(domain));
     let mut last_component_opt = None;
     for component in url_path.split("/") {
+        if component.is_empty() {
+            continue;
+        }
         if let Some(last_component) = last_component_opt {
             path = path.join(component_to_url_safe(last_component))
         }
