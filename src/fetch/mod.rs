@@ -21,7 +21,7 @@ use serde_json::json;
 use url::Url;
 
 use self::env::Env;
-use self::templates::{ObjectHtmlParams, ProfileHtmlParams, Templates};
+use self::templates::{ObjectHtmlParams, ProfileHtmlParams, Templates, TopHtmlParams};
 
 pub async fn run(
     input_path: &str,
@@ -43,6 +43,19 @@ pub async fn run(
     };
 
     let predef_urls = save_predefs(&env).await?;
+
+    env.output
+        .save_top_page(&env.templates.render_top_html(&TopHtmlParams {
+            title: match input.title {
+                Some(title) => title,
+                None => "Archived ActivityPub Server".to_string(),
+            },
+            description: match input.description {
+                Some(description) => description,
+                None => "A hub of archived ActivityPub servers.".to_string(),
+            },
+        })?)
+        .await?;
 
     for account in input.accounts {
         fetch_account(&env, &predef_urls, &account).await?;

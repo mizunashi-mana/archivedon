@@ -17,6 +17,12 @@ impl Output {
         })
     }
 
+    pub async fn save_top_page(&self, content: &str) -> Result<(), Box<dyn Error>> {
+        let save_path = &self.resource_path.index_html_path;
+        fs::write(save_path, content).await?;
+        Ok(())
+    }
+
     pub async fn save_webfinger_resource(
         &self,
         content: &WebfingerResource,

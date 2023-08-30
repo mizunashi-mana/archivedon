@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Input {
+    pub title: Option<String>,
+    pub description: Option<String>,
     pub static_base_url: String,
     pub accounts: Vec<String>,
 }
