@@ -26,6 +26,9 @@ enum Commands {
 
         #[arg(long, env = "RESOURCE_DIR")]
         resource_dir: String,
+
+        #[arg(long, env = "EXPOSE_URL_BASE")]
+        expose_url_base: String,
     },
 }
 
@@ -38,8 +41,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             addr,
             port,
             resource_dir,
+            expose_url_base,
             ..
-        } => cmd::serve::run(addr, *port, resource_dir),
+        } => cmd::serve::run(addr, *port, resource_dir, expose_url_base),
     }
     .await?;
 

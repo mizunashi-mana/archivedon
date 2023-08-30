@@ -21,7 +21,7 @@ use serde_json::json;
 use url::Url;
 
 use self::env::Env;
-use self::templates::{ObjectHtmlParams, ProfileHtmlParams, Templates};
+use self::templates::{ObjectHtmlParams, ProfileHtmlParams, Templates, TopHtmlParams};
 
 pub async fn run(
     input_path: &str,
@@ -43,6 +43,19 @@ pub async fn run(
     };
 
     let predef_urls = save_predefs(&env).await?;
+
+    env.output
+        .save_top_page(&env.templates.render_top_html(&TopHtmlParams {
+            title: match input.title {
+                Some(title) => title,
+                None => "Archived ActivityPub Server".to_string(),
+            },
+            description: match input.description {
+                Some(description) => description,
+                None => "A hub of archived ActivityPub servers.".to_string(),
+            },
+        })?)
+        .await?;
 
     for account in input.accounts {
         fetch_account(&env, &predef_urls, &account).await?;
@@ -385,7 +398,21 @@ async fn save_actor_resource(
             suspended: Some(true),
             devices: Some(predef_urls.empty_collection_url.to_string()),
         },
-        security_items: original_actor.security_items,
+        security_items: ap_model::SecurityItems {
+            public_key: match original_actor.security_items.public_key {
+                None => None,
+                Some(original_key) => {
+                    let mut key_id = account.actor_url.clone();
+                    key_id.set_fragment(Some("main-key"));
+                    Some(ap_model::Key {
+                        // Misskey check the host of the id of the public key is same one of the actor.
+                        id: key_id.to_string(),
+                        owner: original_key.owner,
+                        public_key_pem: original_key.public_key_pem,
+                    })
+                }
+            },
+        },
     };
 
     output

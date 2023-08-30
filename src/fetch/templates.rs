@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub const TEMPLATE_KEY_PROFILE_HTML: &str = "PROFILE_HTML";
 pub const TEMPLATE_KEY_OBJECT_HTML: &str = "OBJECT_HTML";
+pub const TEMPLATE_KEY_TOP_HTML: &str = "TOP_HTML";
 
 #[derive(Serialize, Deserialize)]
 pub struct ProfileHtmlParams {
@@ -31,6 +32,12 @@ pub struct ObjectHtmlParams {
     pub content_map: HashMap<String, String>,
     pub url: Option<String>,
     pub published: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TopHtmlParams {
+    pub title: String,
+    pub description: String,
 }
 
 pub struct Templates<'a> {
@@ -92,6 +99,25 @@ impl<'a> Templates<'a> {
             "</html>",
         ].join(""))?;
 
+        handlebars.register_template_string(TEMPLATE_KEY_TOP_HTML, &[
+            "<!DOCTYPE html>",
+            "<html>",
+            "<head>",
+            "<meta charset=\"utf-8\">",
+            "<meta content=\"width=device-width, initial-scale=1\" name=\"viewport\">",
+            "<title>{{title}}</title>",
+            "<meta content=\"{{description}}\" property=\"description\" />",
+            "<meta content=\"{{title}}\" property=\"og:title\" />",
+            "<meta content=\"{{description}}\" property=\"og:description\" />",
+            "</head>",
+            "<body>",
+            "<h1>{{title}}</h1>",
+            "<p>{{description}}</p>",
+            "<p>Powered by <a href=\"https://github.com/mizunashi-mana/archivedon\">https://github.com/mizunashi-mana/archivedon</a></p>",
+            "</body>",
+            "</html>",
+        ].join(""))?;
+
         Ok(Templates { handlebars })
     }
 
@@ -104,5 +130,9 @@ impl<'a> Templates<'a> {
 
     pub fn render_object_html(&self, params: &ObjectHtmlParams) -> Result<String, Box<dyn Error>> {
         Ok(self.handlebars.render(TEMPLATE_KEY_OBJECT_HTML, params)?)
+    }
+
+    pub fn render_top_html(&self, params: &TopHtmlParams) -> Result<String, Box<dyn Error>> {
+        Ok(self.handlebars.render(TEMPLATE_KEY_TOP_HTML, params)?)
     }
 }

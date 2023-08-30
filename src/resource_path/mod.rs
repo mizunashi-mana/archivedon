@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use crate::path_helper;
 
 pub struct ResourcePath {
+    pub index_html_path: PathBuf,
     webfinger_root_dir: PathBuf,
     pub static_root_dir: PathBuf,
     redirect_map_root_dir: PathBuf,
@@ -11,6 +12,7 @@ pub struct ResourcePath {
 impl ResourcePath {
     pub fn new(root_dir: PathBuf) -> Self {
         Self {
+            index_html_path: root_dir.join("index.html"),
             webfinger_root_dir: root_dir.join("webfinger"),
             static_root_dir: root_dir.join("static"),
             redirect_map_root_dir: root_dir.join("map"),

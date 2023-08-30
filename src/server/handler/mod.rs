@@ -1,3 +1,4 @@
+pub mod nodeinfo;
 pub mod redirect_map;
 pub mod webfinger;
 
