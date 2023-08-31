@@ -21,12 +21,10 @@ $ cat input.json
     ]
 }
 $ archivedon-fetch --input input.json --output output --fetch-outbox
-$ ls output
-map/  static/  webfinger/
 ```
 
 ## Serve
 
 ```
-$ archivedon --port 8000 --resource-dir output
+$ archivedon serve --help
 ```

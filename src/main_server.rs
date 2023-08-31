@@ -18,15 +18,19 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Serve {
+        /// A bind IP address to listen.
         #[arg(long, env = "ADDR")]
         addr: Option<String>,
 
+        /// A bind port number to listen.
         #[arg(short, long, env = "PORT")]
         port: u16,
 
+        /// A path of resource directory to serve.
         #[arg(long, env = "RESOURCE_DIR")]
         resource_dir: String,
 
+        /// An URL which the server expose.
         #[arg(long, env = "EXPOSE_URL_BASE")]
         expose_url_base: String,
     },

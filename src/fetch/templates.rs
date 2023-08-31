@@ -107,6 +107,7 @@ impl<'a> Templates<'a> {
             "<meta content=\"width=device-width, initial-scale=1\" name=\"viewport\">",
             "<title>{{title}}</title>",
             "<meta content=\"{{description}}\" property=\"description\" />",
+            "<!-- Fetch them by Misskey -->",
             "<meta content=\"{{title}}\" property=\"og:title\" />",
             "<meta content=\"{{description}}\" property=\"og:description\" />",
             "</head>",
