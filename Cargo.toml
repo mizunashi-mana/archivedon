@@ -1,7 +1,7 @@
 [package]
 name = "archivedon"
 authors = ["Mizunashi Mana <contact@mizunashi.work>"]
-version = "0.7.0"
+version = "0.8.0"
 description = "An archived ActivityPub server."
 repository = "https://github.com/mizunashi-mana/archivedon"
 edition = "2021"
