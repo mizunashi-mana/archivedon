@@ -31,7 +31,7 @@ jobs:
             -   name: Build
                 run: cargo build --release --verbose --target=${{ matrix.target }}
 
-            -   name: Build
+            -   name: Pack artifacts
                 run: |
                     mkdir -p dest
                     cp target/${{ matrix.target }}/release/archivedon-fetch dest/archivedon-fetch.${{ matrix.target }}
