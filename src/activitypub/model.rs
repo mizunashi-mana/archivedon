@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use url::Url;
+
+use crate::helper::url_helper::FullUrl;
 
 /**
  * Schema: https://www.w3.org/TR/json-ld/#the-context
@@ -183,16 +184,10 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn as_full_url(&self) -> Option<Url> {
-        match Url::parse(&self.href) {
+    pub fn as_full_url(&self) -> Option<FullUrl> {
+        match FullUrl::parse(&self.href) {
             Err(_) => None,
-            Ok(url) => {
-                if url.domain().is_none() {
-                    None
-                } else {
-                    Some(url)
-                }
-            }
+            Ok(url) => Some(url),
         }
     }
 }

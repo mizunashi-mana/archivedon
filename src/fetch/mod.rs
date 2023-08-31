@@ -11,6 +11,7 @@ mod webfinger;
 
 use archivedon::activitypub::json::ModelConv;
 use archivedon::activitypub::model as ap_model;
+use archivedon::helper::url_helper::FullUrl;
 use archivedon::redirect_map::RedirectMap;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
 use chrono::Utc;
@@ -158,6 +159,7 @@ async fn fetch_account<'a>(
 
     save_profile_resource(&env.output, &account, &account_actor, &env.templates).await?;
 
+    let original_account_id_opt = account_actor.id.clone();
     let original_account_link_opt = account_actor.object_items.url.clone();
 
     save_actor_resource(
@@ -169,35 +171,36 @@ async fn fetch_account<'a>(
     )
     .await?;
 
+    if let Some(actor_id) = original_account_id_opt {
+        match FullUrl::parse(&actor_id) {
+            Ok(actor_id_url) => {
+                save_redirect_map(
+                    env,
+                    actor_id_url.domain(),
+                    actor_id_url.path(),
+                    &["application/activity+json".to_string()],
+                    &account.actor_url,
+                )
+                .await?;
+            }
+            Err(err) => {
+                println!("Warning: ID of actor is illegal: id={actor_id}, err={err}");
+            }
+        }
+    }
+
     if let Some(link) = original_account_link_opt {
         if let Some(old_url) = link.as_full_url() {
-            let domain = match old_url.domain() {
-                None => panic!("unreachable: The domain of full URL should be available."),
-                Some(x) => x,
+            let media_type = if link.media_type.is_empty() {
+                vec!["*/*".to_string()]
+            } else {
+                link.media_type.clone()
             };
             save_redirect_map(
                 env,
-                domain,
+                old_url.domain(),
                 old_url.path(),
-                &["application/activity+json".to_string()],
-                &account.actor_url,
-            )
-            .await?;
-
-            let mut rest_media_type = vec!["*/*".to_string()];
-            for typ in link.media_type {
-                match typ.as_str() {
-                    "application/activity+json" => {
-                        // do nothing
-                    }
-                    _ => rest_media_type.push(typ),
-                }
-            }
-            save_redirect_map(
-                env,
-                domain,
-                old_url.path(),
-                &rest_media_type,
+                &media_type,
                 &account.profile_url,
             )
             .await?;
@@ -337,7 +340,7 @@ async fn save_actor_resource(
 
     let actor = ap_model::Object {
         schema_context: Some(ap_model::Context::object_default()),
-        id: Some(account.actor_url.to_string()),
+        id: original_actor.id,
         typ: original_actor.typ,
         object_items: ap_model::ObjectItems {
             url: original_actor.object_items.url,
@@ -398,21 +401,7 @@ async fn save_actor_resource(
             suspended: Some(true),
             devices: Some(predef_urls.empty_collection_url.to_string()),
         },
-        security_items: ap_model::SecurityItems {
-            public_key: match original_actor.security_items.public_key {
-                None => None,
-                Some(original_key) => {
-                    let mut key_id = account.actor_url.clone();
-                    key_id.set_fragment(Some("main-key"));
-                    Some(ap_model::Key {
-                        // Misskey check the host of the id of the public key is same one of the actor.
-                        id: key_id.to_string(),
-                        owner: original_key.owner,
-                        public_key_pem: original_key.public_key_pem,
-                    })
-                }
-            },
-        },
+        security_items: original_actor.security_items,
     };
 
     output
@@ -797,9 +786,10 @@ async fn save_outbox_object<'a>(
 
     let save_json_path = format!("{}entities/{id}.json", account.base_path);
     let new_object_url = env.static_base_url.join(&save_json_path)?;
+
     let new_object = ap_model::Object {
         schema_context: Some(ap_model::Context::object_default()),
-        id: Some(new_object_url.to_string()),
+        id: object.id.clone(),
         typ: object.typ.clone(),
         object_items: ap_model::ObjectItems {
             updated: Some(Utc::now()),
@@ -880,15 +870,29 @@ async fn save_outbox_object<'a>(
         )
         .await?;
 
+    if let Some(object_id) = &object.id {
+        match FullUrl::parse(object_id) {
+            Ok(object_id_url) => {
+                save_redirect_map(
+                    env,
+                    object_id_url.domain(),
+                    object_id_url.path(),
+                    &["application/activity+json".to_string()],
+                    &account.actor_url,
+                )
+                .await?;
+            }
+            Err(err) => {
+                println!("Warning: ID of actor is illegal: id={object_id}, err={err}");
+            }
+        }
+    }
+
     if let Some(link) = &object.object_items.url {
         if let Some(old_url) = &link.as_full_url() {
-            let domain = match old_url.domain() {
-                None => panic!("unreachable: The domain of full URL should be available."),
-                Some(x) => x,
-            };
             save_redirect_map(
                 env,
-                domain,
+                old_url.domain(),
                 old_url.path(),
                 &link.media_type,
                 &new_object_url,
