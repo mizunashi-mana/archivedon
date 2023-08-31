@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::path_helper;
+use crate::helper::path_helper;
 
 pub struct ResourcePath {
     pub index_html_path: PathBuf,

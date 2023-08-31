@@ -56,7 +56,8 @@ pub async fn handle_resource(_: String) -> Result<Box<dyn warp::Reply>, warp::Re
         },
     });
     let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
-    let reply = warp::reply::with_header(reply, "Content-Type", "application/jrd+json");
+    let reply =
+        warp::reply::with_header(reply, "Content-Type", "application/jrd+json; charset=utf-8");
 
     Ok(Box::new(reply))
 }

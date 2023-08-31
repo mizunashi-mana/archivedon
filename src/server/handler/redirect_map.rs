@@ -73,6 +73,7 @@ pub async fn handle(
 
     let reply = warp::reply::reply();
     let reply = warp::reply::with_status(reply, warp::http::StatusCode::MOVED_PERMANENTLY);
+    let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
     let reply = warp::reply::with_header(reply, "Location", redirect_url.to_string());
 
     Ok(Box::new(reply))
