@@ -106,7 +106,8 @@ async fn handle_resource(
 
     let reply = warp::reply::json(&resource);
     let reply = warp::reply::with_header(reply, "Access-Control-Allow-Origin", "*");
-    let reply = warp::reply::with_header(reply, "Content-Type", "application/jrd+json");
+    let reply =
+        warp::reply::with_header(reply, "Content-Type", "application/jrd+json; charset=utf-8");
 
     Ok(Box::new(reply))
 }
