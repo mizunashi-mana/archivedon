@@ -402,6 +402,7 @@ async fn save_actor_resource(
             devices: Some(predef_urls.empty_collection_url.to_string()),
         },
         security_items: original_actor.security_items,
+        property_items: original_actor.property_items,
     };
 
     output
@@ -835,6 +836,7 @@ async fn save_outbox_object<'a>(
         activity_streams_ext_items: object.activity_streams_ext_items.clone(),
         mastodon_ext_items: object.mastodon_ext_items.clone(),
         security_items: object.security_items.clone(),
+        property_items: object.property_items.clone(),
     };
     env.output
         .save_static_json_resource(&save_json_path, &new_object.clone().from_model()?)
@@ -979,6 +981,7 @@ async fn save_outbox_activity<'a>(
         activity_streams_ext_items: original_activity.activity_streams_ext_items.clone(),
         mastodon_ext_items: original_activity.mastodon_ext_items.clone(),
         security_items: original_activity.security_items.clone(),
+        property_items: original_activity.property_items.clone(),
     };
 
     env.output
@@ -1042,6 +1045,7 @@ async fn save_outbox_collection_page<'a>(
                 activity_streams_ext_items: ap_model::ActivityStreamExtItems::empty(),
                 mastodon_ext_items: ap_model::MastodonExtItems::empty(),
                 security_items: ap_model::SecurityItems::empty(),
+                property_items: ap_model::PropertyItems::empty(),
             }
             .from_model()?,
         )

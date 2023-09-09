@@ -98,6 +98,9 @@ fn serialize_object() {
                 public_key_pem: Some("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n".to_string()),
             }),
         },
+        property_items: ap_model::PropertyItems {
+            value: None,
+        },
     };
     let serialized_data = serde_json::to_value(&data.from_model().unwrap()).unwrap();
     let expected_data = r#"{
@@ -131,6 +134,11 @@ fn serialize_object() {
                 "@id": "toot:devices",
                 "@type": "@id"
             }
+          },
+          {
+            "schema": "http://schema.org#",
+            "PropertyValue": "schema:PropertyValue",
+            "value": "schema:value"
           }
         ],
         "id": "https://example.com/users/sample",
@@ -199,6 +207,11 @@ fn deserialize_object() {
                 "@id": "toot:devices",
                 "@type": "@id"
             }
+          },
+          {
+            "schema": "http://schema.org#",
+            "PropertyValue": "schema:PropertyValue",
+            "value": "schema:value"
           }
         ],
         "id": "https://example.com/users/sample",
@@ -254,6 +267,11 @@ fn deserialize_object() {
                     ("toot", ap_model::Iri::from("http://joinmastodon.org/ns#")),
                     ("discoverable", ap_model::Iri::from("toot:discoverable")),
                     ("suspended", ap_model::Iri::from("toot:suspended")),
+                ]),
+                ap_model::Context::from([
+                    ("schema", ap_model::Iri::from("http://schema.org#")),
+                    ("value", ap_model::Iri::from("schema:value")),
+                    ("PropertyValue", ap_model::Iri::from("schema:PropertyValue")),
                 ]),
             ])),
             id: Some("https://example.com/users/sample".to_string()),
@@ -326,6 +344,9 @@ fn deserialize_object() {
                     owner: "https://example.com/users/sample".to_string(),
                     public_key_pem: Some("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxcce3F6A9ZFVG/q7t/4V\nkCQ0fs7RlLhgynbH/0BBqEq+PUOj77d42bw2LEv/gBE9bHeqyXlPDuZ6qFtzR6Ux\n6z7jjvz7zR0C0XkfmGXiWhMZXt/jHKqiIjVipo82ysI6blsA6F/y7m5ASniPSITk\nvs82dodLA21h3XccFJldtELdPPX3KDeCHN0hvlXHj7R0Z4kNPNleg9xppQ3Ry8es\nOZtJcUHeWRbeVabIVhY7Y75pcdsfIQc3rcXtLkS5iU6bAVAl1riCjWS2XXQDufdG\nrBEiBSFn+sf6ulRy+bzYHgCW1pNr8L7HqWkMcwGxKWyfZ9dhi8fIqYlli8Y1EaHo\ngwIDAQAB\n-----END PUBLIC KEY-----\n".to_string()),
                 }),
+            },
+            property_items: ap_model::PropertyItems {
+                value: None,
             },
         },
     );

@@ -146,6 +146,7 @@ impl ModelConv for model::Object {
             suspended: self.mastodon_ext_items.suspended,
             devices: self.mastodon_ext_items.devices,
             public_key: from_model_opt(self.security_items.public_key)?,
+            value: self.property_items.value,
         })
     }
 
@@ -283,6 +284,9 @@ impl ModelConv for model::Object {
             },
             security_items: model::SecurityItems {
                 public_key: to_model_opt(origin.public_key)?,
+            },
+            property_items: model::PropertyItems {
+                value: origin.value,
             },
         })
     }
@@ -716,6 +720,9 @@ pub struct Object {
     // https://w3id.org/security/v1
     #[serde(rename = "publicKey")]
     public_key: Option<Key>,
+
+    // https://schema.org/PropertyValue
+    value: Option<String>,
 }
 
 #[skip_serializing_none]
