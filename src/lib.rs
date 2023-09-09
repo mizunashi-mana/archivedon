@@ -1,4 +1,3 @@
-pub mod activitypub;
 pub mod helper;
 pub mod nodeinfo;
 pub mod redirect_map;

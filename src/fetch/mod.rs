@@ -9,8 +9,8 @@ mod output;
 mod templates;
 mod webfinger;
 
-use archivedon::activitypub::json::ModelConv;
-use archivedon::activitypub::model as ap_model;
+use activitist::json::SerdeJsonValue;
+use activitist::model as ap_model;
 use archivedon::helper::url_helper::FullUrl;
 use archivedon::redirect_map::RedirectMap;
 use archivedon::webfinger::resource::{Link as WebfingerLink, Resource as WebfingerResource};
@@ -190,7 +190,7 @@ async fn fetch_account<'a>(
     }
 
     if let Some(link) = original_account_link_opt {
-        if let Some(old_url) = link.as_full_url() {
+        if let Ok(old_url) = FullUrl::parse(&link.href) {
             let media_type = if link.media_type.is_empty() {
                 vec!["*/*".to_string()]
             } else {
@@ -252,7 +252,10 @@ async fn save_predefs<'a>(env: &Env<'a>) -> Result<PredefUrls, Box<dyn Error>> {
     };
 
     env.output
-        .save_static_json_resource(inbox_path, &json!({"error": "Not Found"}))
+        .save_static_json_resource(
+            inbox_path,
+            &SerdeJsonValue::new(json!({"error": "Not Found"})),
+        )
         .await?;
 
     env.output
@@ -267,8 +270,7 @@ async fn save_predefs<'a>(env: &Env<'a>) -> Result<PredefUrls, Box<dyn Error>> {
                 None,
                 vec![],
                 vec![],
-            )
-            .from_model()?,
+            ),
         )
         .await?;
 
@@ -284,8 +286,7 @@ async fn save_predefs<'a>(env: &Env<'a>) -> Result<PredefUrls, Box<dyn Error>> {
                 None,
                 vec![],
                 vec![],
-            )
-            .from_model()?,
+            ),
         )
         .await?;
 
@@ -406,7 +407,7 @@ async fn save_actor_resource(
     };
 
     output
-        .save_static_json_resource(&account.actor_path, &actor.from_model()?)
+        .save_static_json_resource(&account.actor_path, &actor)
         .await
 }
 
@@ -839,7 +840,7 @@ async fn save_outbox_object<'a>(
         property_items: object.property_items.clone(),
     };
     env.output
-        .save_static_json_resource(&save_json_path, &new_object.clone().from_model()?)
+        .save_static_json_resource(&save_json_path, &new_object)
         .await?;
 
     let save_html_path = format!("{}entities/{id}.html", account.base_path);
@@ -891,7 +892,7 @@ async fn save_outbox_object<'a>(
     }
 
     if let Some(link) = &object.object_items.url {
-        if let Some(old_url) = &link.as_full_url() {
+        if let Ok(old_url) = FullUrl::parse(&link.href) {
             save_redirect_map(
                 env,
                 old_url.domain(),
@@ -985,7 +986,7 @@ async fn save_outbox_activity<'a>(
     };
 
     env.output
-        .save_static_json_resource(new_activity_path, &new_activity.clone().from_model()?)
+        .save_static_json_resource(new_activity_path, &new_activity)
         .await?;
 
     Ok(new_activity)
@@ -1046,8 +1047,7 @@ async fn save_outbox_collection_page<'a>(
                 mastodon_ext_items: ap_model::MastodonExtItems::empty(),
                 security_items: ap_model::SecurityItems::empty(),
                 property_items: ap_model::PropertyItems::empty(),
-            }
-            .from_model()?,
+            },
         )
         .await?;
 
@@ -1085,8 +1085,7 @@ async fn save_outbox_collection<'a>(
                 },
                 vec![],
                 vec![],
-            )
-            .from_model()?,
+            ),
         )
         .await?;
 

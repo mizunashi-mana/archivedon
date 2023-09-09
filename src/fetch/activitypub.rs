@@ -1,15 +1,13 @@
-use archivedon::activitypub::json as ap_json;
-use archivedon::activitypub::model as ap_model;
+use activitist::json::JsonSerde;
+use activitist::model as ap_model;
 use reqwest::StatusCode;
-use serde::de::DeserializeOwned;
 use std::error::Error;
 
 pub async fn fetch_actor(
     client: &reqwest::Client,
     uri: String,
 ) -> Result<ap_model::Object, Box<dyn Error>> {
-    let object: ap_model::Object =
-        ap_json::ModelConv::to_model(fetch_ap_resource(client, uri).await?)?;
+    let object: ap_model::Object = fetch_ap_resource(client, uri).await?;
     if object.actor_items.is_none() {
         Err(format!("Actor items are should be available.").into())
     } else {
@@ -21,12 +19,11 @@ pub async fn fetch_object(
     client: &reqwest::Client,
     uri: String,
 ) -> Result<ap_model::Object, Box<dyn Error>> {
-    let object: ap_model::Object =
-        ap_json::ModelConv::to_model(fetch_ap_resource(client, uri).await?)?;
+    let object: ap_model::Object = fetch_ap_resource(client, uri).await?;
     Ok(object)
 }
 
-pub async fn fetch_ap_resource<T: DeserializeOwned>(
+pub async fn fetch_ap_resource<T: JsonSerde>(
     client: &reqwest::Client,
     uri: String,
 ) -> Result<T, Box<dyn Error>> {
@@ -48,7 +45,7 @@ pub async fn fetch_ap_resource<T: DeserializeOwned>(
             x => return Err(format!("Unknown response: status={x}").into()),
         }
 
-        let data: T = response.json().await?;
+        let data: T = T::from_json_bytes(&response.bytes().await?)?;
 
         return Ok(data);
     }
