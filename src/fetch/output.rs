@@ -1,7 +1,7 @@
+use activitist::json::JsonSerde;
 use archivedon::redirect_map::RedirectMap;
 use archivedon::resource_path::ResourcePath;
 use archivedon::webfinger::resource::Resource as WebfingerResource;
-use serde::Serialize;
 use std::{error::Error, path::Path};
 use tokio::fs;
 
@@ -33,14 +33,14 @@ impl Output {
         Ok(())
     }
 
-    pub async fn save_static_json_resource<T: Serialize>(
+    pub async fn save_static_json_resource<T: JsonSerde>(
         &self,
         path: &str,
         content: &T,
     ) -> Result<(), Box<dyn Error>> {
         let save_path = self.resource_path.static_root_dir.join(path);
         fs::create_dir_all(save_path.parent().unwrap()).await?;
-        fs::write(&save_path, serde_json::to_vec(content)?).await?;
+        fs::write(&save_path, content.to_json_bytes()?).await?;
         Ok(())
     }
 
