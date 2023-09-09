@@ -70,6 +70,11 @@ impl Context {
                 ),
                 ("suspended", Iri::from("toot:suspended")),
             ]),
+            Context::from([
+                ("schema", Iri::from("http://schema.org#")),
+                ("PropertyValue", Iri::from("schema:PropertyValue")),
+                ("value", Iri::from("schema:value")),
+            ]),
         ])
     }
 }
@@ -103,6 +108,7 @@ pub struct Object {
     pub activity_streams_ext_items: ActivityStreamExtItems,
     pub mastodon_ext_items: MastodonExtItems,
     pub security_items: SecurityItems,
+    pub property_items: PropertyItems,
 }
 
 impl Object {
@@ -125,6 +131,7 @@ impl Object {
             activity_streams_ext_items: self.activity_streams_ext_items.clone(),
             mastodon_ext_items: self.mastodon_ext_items.clone(),
             security_items: self.security_items.clone(),
+            property_items: self.property_items.clone(),
         }
     }
 
@@ -162,6 +169,7 @@ impl Object {
             activity_streams_ext_items: ActivityStreamExtItems::empty(),
             mastodon_ext_items: MastodonExtItems::empty(),
             security_items: SecurityItems::empty(),
+            property_items: PropertyItems::empty(),
         }
     }
 }
@@ -538,6 +546,20 @@ pub struct SecurityItems {
 impl SecurityItems {
     pub fn empty() -> Self {
         Self { public_key: None }
+    }
+}
+
+/**
+ * Reference: https://schema.org/PropertyValue
+ */
+#[derive(PartialEq, Debug, Clone)]
+pub struct PropertyItems {
+    pub value: Option<String>,
+}
+
+impl PropertyItems {
+    pub fn empty() -> Self {
+        Self { value: None }
     }
 }
 
