@@ -767,7 +767,8 @@ struct NewObject {
     object: ap_model::Object,
 }
 
-static RE_ID: Lazy<Regex> = Lazy::new(|| Regex::new(r".*/(?<id>\d+)$").unwrap());
+static RE_ID: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r".*/(statuses|notes)/(?<id>[a-z0-9]+)$").unwrap());
 
 async fn save_outbox_object<'a>(
     env: &Env<'a>,
@@ -862,8 +863,8 @@ async fn save_outbox_object<'a>(
                 content: object.object_items.content.first().cloned(),
                 content_map: object.object_items.content_map.clone(),
                 url: match &object.object_items.url {
-                    None => None,
                     Some(item) => Some(item.href.to_string()),
+                    None => object.id.clone(),
                 },
                 published: match object.object_items.published {
                     None => None,
