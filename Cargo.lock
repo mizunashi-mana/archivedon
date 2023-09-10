@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "activitist"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5dd88147ca7e44036292f284d29419f562b1d4d85bea1971dce4e6e77254fba"
+checksum = "c90d58df4adfc0664e70eaac7e69b731b45ab60c32fb338a9b8706ac8004b811"
 dependencies = [
  "chrono",
  "serde",
@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "archivedon"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "activitist",
  "base64 0.21.2",
