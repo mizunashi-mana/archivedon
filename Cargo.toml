@@ -22,7 +22,7 @@ regex = "1.9"
 base64 = "0.21"
 once_cell = "1.18"
 log = "0.4"
-activitist = "0.3"
+activitist = "0.4"
 
 [[bin]]
 name = "archivedon"
