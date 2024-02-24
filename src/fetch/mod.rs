@@ -191,10 +191,10 @@ async fn fetch_account<'a>(
 
     if let Some(link) = original_account_link_opt {
         if let Ok(old_url) = FullUrl::parse(&link.href) {
-            let media_type = if link.media_type.is_empty() {
+            let media_type = if link.object_items.media_type.is_empty() {
                 vec!["*/*".to_string()]
             } else {
-                link.media_type.clone()
+                link.object_items.media_type.clone()
             };
             save_redirect_map(
                 env,
@@ -898,7 +898,7 @@ async fn save_outbox_object<'a>(
                 env,
                 old_url.domain(),
                 old_url.path(),
-                &link.media_type,
+                &link.object_items.media_type,
                 &new_object_url,
             )
             .await?;
